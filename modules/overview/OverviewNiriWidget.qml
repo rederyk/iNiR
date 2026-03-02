@@ -220,9 +220,11 @@ Item {
              : Appearance.inirEverywhere ? Appearance.inir.colLayer1
              : Appearance.auroraEverywhere ? Appearance.aurora.colPopupSurface
              : Appearance.colors.colBackgroundSurfaceContainer
-        border.width: (Appearance.angelEverywhere || Appearance.inirEverywhere) ? 1 : 0
+        border.width: Appearance.angelEverywhere ? Appearance.angel.cardBorderWidth : 1
         border.color: Appearance.angelEverywhere ? Appearance.angel.colBorder
-            : Appearance.inirEverywhere ? Appearance.inir.colBorder : "transparent"
+            : Appearance.inirEverywhere ? Appearance.inir.colBorder
+            : Appearance.auroraEverywhere ? ColorUtils.transparentize(Appearance.colors.colOutlineVariant, 0.72)
+            : ColorUtils.transparentize(Appearance.colors.colOutlineVariant, 0.68)
 
         Column {
             id: workspaceColumnLayout
@@ -371,10 +373,15 @@ Item {
                             Rectangle {
                                 anchors.fill: parent
                                 color: "transparent"
-                                border.width: 2
+                                border.width: hoveredWhileDragging ? 2 : 1
                                 // Usar este borde sólo para hover/drag.
                                 // El estado activo se dibuja con focusedWorkspaceIndicator para evitar solapamientos.
-                                border.color: hoveredWhileDragging ? hoveredBorderColor : "transparent"
+                                border.color: hoveredWhileDragging
+                                    ? hoveredBorderColor
+                                    : (Appearance.angelEverywhere ? ColorUtils.transparentize(Appearance.angel.colBorder, 0.64)
+                                        : Appearance.inirEverywhere ? ColorUtils.transparentize(Appearance.inir.colBorder, 0.45)
+                                        : Appearance.auroraEverywhere ? ColorUtils.transparentize(Appearance.colors.colOutlineVariant, 0.78)
+                                        : ColorUtils.transparentize(Appearance.colors.colOutlineVariant, 0.74))
                                 topLeftRadius: workspace.topLeftRadius
                                 topRightRadius: workspace.topRightRadius
                                 bottomLeftRadius: workspace.bottomLeftRadius

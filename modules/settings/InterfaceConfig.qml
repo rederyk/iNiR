@@ -2574,9 +2574,20 @@ ContentPage {
                 title: Translation.tr("Positioning")
 
                 SettingsSwitch {
+                    buttonIcon: "vertical_align_center"
+                    text: Translation.tr("Center launcher panel")
+                    checked: Config.options?.overview?.centerLauncher ?? false
+                    onCheckedChanged: Config.setNestedValue("overview.centerLauncher", checked)
+                    StyledToolTip {
+                        text: Translation.tr("Center the Super+Space launcher vertically. Disables top/bottom margin adjustments while enabled")
+                    }
+                }
+
+                SettingsSwitch {
                     buttonIcon: "dashboard_customize"
                     text: Translation.tr("Respect bar area (never overlap)")
                     checked: !Config.options.overview || Config.options.overview.respectBar !== false
+                    enabled: !(Config.options?.overview?.centerLauncher ?? false)
                     onCheckedChanged: {
                         if (!Config.options.overview)
                             Config.options.overview = ({})
@@ -2592,6 +2603,7 @@ ContentPage {
                     ConfigSpinBox {
                         icon: "vertical_align_top"
                         text: Translation.tr("Extra top margin (px)")
+                        enabled: !(Config.options?.overview?.centerLauncher ?? false)
                         value: Config.options.overview && Config.options.overview.topMargin !== undefined
                                ? Config.options.overview.topMargin
                                : 0
@@ -2610,6 +2622,7 @@ ContentPage {
                     ConfigSpinBox {
                         icon: "vertical_align_bottom"
                         text: Translation.tr("Extra bottom margin (px)")
+                        enabled: !(Config.options?.overview?.centerLauncher ?? false)
                         value: Config.options.overview && Config.options.overview.bottomMargin !== undefined
                                ? Config.options.overview.bottomMargin
                                : 0

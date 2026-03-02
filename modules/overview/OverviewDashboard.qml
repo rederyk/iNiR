@@ -123,32 +123,54 @@ Item {
     readonly property color colText: angelStyle ? Appearance.angel.colText : inirStyle ? Appearance.inir.colText : Appearance.colors.colOnLayer1
     readonly property color colSubtext: angelStyle ? Appearance.angel.colTextSecondary : inirStyle ? Appearance.inir.colTextSecondary : Appearance.colors.colSubtext
     readonly property color colCardBg: angelStyle 
-        ? ColorUtils.transparentize(blendedColors?.colLayer0 ?? Appearance.colors.colLayer0Base, Appearance.angel.overlayOpacity)
+        ? ColorUtils.transparentize(Appearance.colors.colLayer0Base, Appearance.angel.overlayOpacity)
         : inirStyle ? Appearance.inir.colLayer0
-        : auroraStyle ? ColorUtils.applyAlpha(blendedColors?.colLayer0 ?? Appearance.colors.colLayer0, 1)
-        : Appearance.colors.colLayer0
+        : auroraStyle ? ColorUtils.transparentize(
+            Appearance.colors.colLayer0Base,
+            Math.max(0.10, Appearance.aurora.overlayTransparentize - 0.12)
+        )
+        : Appearance.colors.colBackgroundSurfaceContainer
     readonly property color colCard: angelStyle 
-        ? ColorUtils.transparentize(blendedColors?.colLayer1 ?? Appearance.colors.colLayer1Base, Appearance.angel.overlayOpacity)
+        ? ColorUtils.transparentize(Appearance.colors.colLayer1Base, Appearance.angel.overlayOpacity)
         : inirStyle ? Appearance.inir.colLayer1
-        : auroraStyle ? ColorUtils.applyAlpha(blendedColors?.colLayer1 ?? Appearance.colors.colLayer1, 1)
+        : auroraStyle ? ColorUtils.transparentize(
+            Appearance.colors.colLayer1Base,
+            Math.max(0.18, Appearance.aurora.subSurfaceTransparentize - 0.14)
+        )
         : Appearance.colors.colLayer1
-    readonly property color colBorder: angelStyle ? Appearance.angel.colBorder : inirStyle ? Appearance.inir.colBorder : Appearance.colors.colLayer0Border
+    readonly property color colBorder: angelStyle ? Appearance.angel.colBorder
+        : inirStyle ? Appearance.inir.colBorder
+        : auroraStyle ? ColorUtils.transparentize(Appearance.colors.colOutlineVariant, 0.72)
+        : Appearance.colors.colLayer0Border
     readonly property color colPrimary: angelStyle ? Appearance.angel.colPrimary : inirStyle ? Appearance.inir.colPrimary : Appearance.colors.colPrimary
     readonly property color colOnPrimary: angelStyle ? Appearance.angel.colOnPrimary : inirStyle ? Appearance.inir.colOnPrimary : Appearance.colors.colOnPrimary
     readonly property color colCardHover: angelStyle ? Appearance.angel.colGlassCardHover : inirStyle ? Appearance.inir.colLayer2Hover
         : auroraStyle ? (Appearance.aurora?.colSubSurfaceHover ?? Appearance.colors.colLayer2Hover) : Appearance.colors.colLayer2Hover
     readonly property color colLayer2: angelStyle ? Appearance.angel.colGlassCard : inirStyle ? Appearance.inir.colLayer2
         : auroraStyle ? (Appearance.aurora?.colSubSurface ?? Appearance.colors.colLayer2) : Appearance.colors.colLayer2
-    readonly property real cardRadius: angelStyle ? Appearance.angel.roundingSmall : inirStyle ? Appearance.inir.roundingSmall : Appearance.rounding.small
-    readonly property real containerRadius: angelStyle ? Appearance.angel.roundingNormal : inirStyle ? Appearance.inir.roundingNormal : Appearance.rounding.normal
-    readonly property int bw: (angelStyle || inirStyle) ? 1 : (auroraStyle ? 0 : 1)
+    readonly property color panelGlassTint: angelStyle
+        ? ColorUtils.transparentize(Appearance.angel.colGlassCard, 0.80)
+        : inirStyle ? root.colCard
+        : auroraStyle ? ColorUtils.transparentize(root.colCard, 0.36)
+        : ColorUtils.transparentize(root.colCard, 0.32)
+    readonly property real cardRadius: angelStyle ? Appearance.angel.roundingSmall : inirStyle ? Appearance.inir.roundingSmall : Appearance.rounding.normal
+    readonly property real containerRadius: angelStyle ? Appearance.angel.roundingNormal : inirStyle ? Appearance.inir.roundingNormal : Appearance.rounding.large
+    readonly property int bw: (angelStyle || inirStyle || auroraStyle) ? 1 : 1
+    readonly property int dashboardMaxWidth: 560
+    readonly property int dashboardHorizontalPadding: 12
+    readonly property int dashboardVerticalPadding: 12
+    readonly property real dashboardSafeHeight: Math.max(260, (root.parent?.height ?? root.screenHeight) - (dashboardVerticalPadding * 2))
 
     // ── Media-adaptive colors ──
     readonly property color mediaBg: {
         if (!hasPlayer) return colCard
         if (angelStyle) return Appearance.angel.colGlassCard
         if (inirStyle) return Appearance.inir.colLayer1
-        if (auroraStyle) return ColorUtils.transparentize(blendedColors?.colLayer0 ?? Appearance.colors.colLayer0, 0.7)
+        if (auroraStyle) return ColorUtils.mix(
+            Appearance.aurora.colSubSurface,
+            blendedColors?.colLayer1 ?? Appearance.colors.colLayer1,
+            0.22
+        )
         return blendedColors?.colLayer0 ?? Appearance.colors.colLayer0
     }
     readonly property color mediaText: hasPlayer ? (angelStyle ? Appearance.angel.colText : inirStyle ? Appearance.inir.colText
@@ -161,6 +183,7 @@ Item {
         : (blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer)
     readonly property color mediaHover: angelStyle ? Appearance.angel.colGlassCardHover : inirStyle ? Appearance.inir.colLayer2Hover
         : ColorUtils.transparentize(blendedColors?.colLayer1 ?? Appearance.colors.colLayer1, 0.5)
+    readonly property int weatherSystemMinHeight: 190
 
     implicitWidth: dashContainer.implicitWidth + Appearance.sizes.elevationMargin * 2
     implicitHeight: dashContainer.implicitHeight + Appearance.sizes.elevationMargin * 2
@@ -174,7 +197,11 @@ Item {
         onTriggered: { if (!root.isYtMusic && root.player) root.player.positionChanged() }
     }
 
-    StyledRectangularShadow { visible: false; target: dashContainer }
+    StyledRectangularShadow {
+        target: dashContainer
+        visible: !root.inirStyle && !root.auroraStyle
+        blur: 0.32 * Appearance.sizes.elevationMargin
+    }
 
     // ── Inline component: Blurred wallpaper card background (angel/aurora) ──
     // Matches ControlPanelContent pattern exactly
@@ -198,18 +225,27 @@ Item {
             layer.effect: MultiEffect {
                 source: blurBgImage
                 anchors.fill: source
-                saturation: root.angelStyle ? Appearance.angel.blurSaturation : 0.2
+                saturation: root.angelStyle ? Appearance.angel.blurSaturation : 0.14
                 blurEnabled: Appearance.effectsEnabled
                 blurMax: 100
-                blur: Appearance.effectsEnabled ? 1 : 0
+                blur: Appearance.effectsEnabled ? 1.12 : 0
             }
 
             // Dark overlay (same as ControlPanelContent)
             Rectangle {
                 anchors.fill: parent
                 color: root.angelStyle
-                    ? ColorUtils.transparentize(root.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0Base, Appearance.angel.overlayOpacity)
-                    : ColorUtils.transparentize(root.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0Base, Appearance.aurora.overlayTransparentize)
+                    ? ColorUtils.transparentize(Appearance.colors.colLayer0Base, Appearance.angel.overlayOpacity)
+                    : ColorUtils.transparentize(
+                        Appearance.colors.colLayer0Base,
+                        Math.max(0.08, Appearance.aurora.overlayTransparentize - 0.14)
+                    )
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: blurBg.targetCard?.radius ?? root.cardRadius
+                color: root.panelGlassTint
             }
         }
     }
@@ -217,23 +253,46 @@ Item {
     // ═══════════════════════════════════════════════════
     // MAIN CONTAINER — transparent, no floating panel
     // ═══════════════════════════════════════════════════
-    Rectangle {
+    GlassBackground {
         id: dashContainer
         anchors.centerIn: parent
-        implicitWidth: mainCol.implicitWidth + 28
-        implicitHeight: mainCol.implicitHeight + 24
+        width: Math.min(root.dashboardMaxWidth, (root.parent?.width ?? root.screenWidth) - (root.dashboardHorizontalPadding * 2))
+        implicitWidth: width
+        implicitHeight: Math.min(mainCol.implicitHeight + 24, root.dashboardSafeHeight)
+        height: implicitHeight
         radius: root.containerRadius
-        color: "transparent"
-        border.width: 0
-        border.color: "transparent"
+        fallbackColor: Appearance.colors.colBackgroundSurfaceContainer
+        inirColor: root.inirStyle ? Appearance.inir.colLayer1 : root.colCardBg
+        auroraTransparency: Math.max(0.16, Appearance.aurora.popupTransparentize - 0.12)
+        border.width: root.angelStyle || root.inirStyle || root.auroraStyle ? 1 : 0
+        border.color: root.angelStyle ? Appearance.angel.colCardBorder
+            : root.inirStyle ? Appearance.inir.colBorder
+            : root.auroraStyle ? ColorUtils.transparentize(Appearance.colors.colOutlineVariant, 0.70)
+            : root.colBorder
+        clip: true
 
-        AngelPartialBorder { visible: false; targetRadius: dashContainer.radius; coverage: 0.4 }
+        AngelPartialBorder { visible: root.angelStyle; targetRadius: dashContainer.radius; coverage: 0.4 }
 
-        ColumnLayout {
-            id: mainCol
-            anchors.centerIn: parent
-            spacing: 10
-            width: 480
+        Flickable {
+            id: dashboardFlick
+            anchors.fill: parent
+            anchors.margins: 0
+            contentWidth: width
+            contentHeight: mainCol.implicitHeight + 24
+            clip: true
+            interactive: contentHeight > height
+            boundsBehavior: Flickable.StopAtBounds
+
+            ScrollBar.vertical: ScrollBar {
+                policy: dashboardFlick.interactive ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+            }
+
+            ColumnLayout {
+                id: mainCol
+                x: (dashboardFlick.width - width) / 2
+                y: 12
+                spacing: 10
+                width: Math.max(320, dashboardFlick.width - 20)
 
             // ═══════════════════════════════════════
             // 0. HEADER: Time + Greeting + Actions
@@ -275,8 +334,17 @@ Item {
                     Rectangle {
                         anchors.fill: parent
                         color: root.angelStyle
-                            ? ColorUtils.transparentize(root.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0Base, Appearance.angel.overlayOpacity)
-                            : ColorUtils.transparentize(root.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0Base, Appearance.aurora.overlayTransparentize)
+                            ? ColorUtils.transparentize(Appearance.colors.colLayer0Base, Appearance.angel.overlayOpacity)
+                            : ColorUtils.transparentize(
+                                Appearance.colors.colLayer0Base,
+                                Math.max(0.08, Appearance.aurora.overlayTransparentize - 0.14)
+                            )
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: headerCard.radius
+                        color: root.panelGlassTint
                     }
                 }
 
@@ -634,7 +702,7 @@ Item {
                         StyledText {
                             Layout.fillWidth: true
                             text: StringUtils.cleanMusicTitle(root.effectiveTitle) || Translation.tr("No media")
-                            font { pixelSize: Appearance.font.pixelSize.normal; weight: Font.SemiBold }
+                            font { pixelSize: 16; weight: Font.DemiBold }
                             color: root.mediaText
                             elide: Text.ElideRight
                             maximumLineCount: 1
@@ -773,7 +841,7 @@ Item {
                 id: weatherCard
                 Layout.fillWidth: true
                 visible: root.cfgWeather && Weather.enabled && (Weather.data?.temp ?? "") !== "" && !(Weather.data?.temp ?? "").startsWith("--")
-                implicitHeight: weatherContent.implicitHeight + 20
+                implicitHeight: Math.max(weatherContent.implicitHeight + 20, root.weatherSystemMinHeight)
                 radius: root.cardRadius
                 color: root.inirStyle ? root.colCard : "transparent"
                 border.width: root.bw
@@ -868,6 +936,7 @@ Item {
                         WeatherChip { icon: "thermostat"; value: Translation.tr("Feels %1").arg(Weather.data?.tempFeelsLike ?? "--"); visible: (Weather.data?.tempFeelsLike ?? "").length > 0 && !(Weather.data?.tempFeelsLike ?? "").startsWith("--") }
                         WeatherChip { icon: "humidity_percentage"; value: Weather.data?.humidity ?? "" }
                         WeatherChip { icon: "air"; value: Weather.data?.wind ?? "" }
+                        WeatherChip { icon: "wb_sunny"; value: Weather.data?.sunrise ?? ""; visible: (Weather.data?.sunrise ?? "") !== "--:--" }
                         WeatherChip { icon: "wb_twilight"; value: Weather.data?.sunset ?? ""; visible: (Weather.data?.sunset ?? "") !== "--:--" }
 
                         Item { Layout.fillWidth: true }
@@ -882,7 +951,7 @@ Item {
                 id: sysCard
                 Layout.fillWidth: true
                 visible: root.cfgSystem
-                implicitHeight: sysContent.implicitHeight + 16
+                implicitHeight: Math.max(sysContent.implicitHeight + 16, root.weatherSystemMinHeight)
                 radius: root.cardRadius
                 color: root.inirStyle ? root.colCard : "transparent"
                 border.width: root.bw
@@ -1122,10 +1191,43 @@ Item {
                             }
                             Item { Layout.fillWidth: true }
                         }
+
+                        Rectangle {
+                            Layout.preferredWidth: 1
+                            Layout.preferredHeight: 12
+                            visible: (ResourceUsage.diskTotal > 1 || Battery.available) && (DateTime.uptime ?? "").length > 0
+                            color: root.colBorder
+                            opacity: 0.4
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            visible: (DateTime.uptime ?? "").length > 0
+                            spacing: 5
+
+                            MaterialSymbol {
+                                text: "schedule"
+                                iconSize: 14
+                                color: root.colSubtext
+                            }
+                            StyledText {
+                                text: Translation.tr("Uptime")
+                                font { pixelSize: Appearance.font.pixelSize.smallest; weight: Font.Medium }
+                                color: root.colSubtext
+                            }
+                            Item { Layout.fillWidth: true }
+                            StyledText {
+                                text: DateTime.uptime
+                                font { pixelSize: Appearance.font.pixelSize.smallest; family: Appearance.font.family.numbers; weight: Font.Medium }
+                                color: root.colSubtext
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
     }
 
     // ═══════════════════════════════════════
@@ -1141,7 +1243,7 @@ Item {
 
         Layout.fillWidth: true
         implicitHeight: toggleCol.implicitHeight + 16
-        radius: root.angelStyle ? Appearance.angel.roundingSmall : root.inirStyle ? Appearance.inir.roundingSmall : Appearance.rounding.small
+        radius: root.angelStyle ? Appearance.angel.roundingSmall : root.inirStyle ? Appearance.inir.roundingSmall : Appearance.rounding.normal
 
         color: toggleArea.containsMouse
             ? (active ? ColorUtils.transparentize(root.colPrimary, 0.25) : root.colCardHover)

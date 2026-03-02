@@ -185,26 +185,39 @@ Scope {
                 scale: GlobalStates.overviewOpen ? 1.0 : 0.97
                 anchors {
                     horizontalCenter: parent.horizontalCenter
-                    top: parent.top
-                    bottom: parent.bottom
+                    top: (Config.options?.overview?.centerLauncher ?? false) ? undefined : parent.top
+                    bottom: (Config.options?.overview?.centerLauncher ?? false) ? undefined : parent.bottom
+                    verticalCenter: (Config.options?.overview?.centerLauncher ?? false) ? parent.verticalCenter : undefined
                     topMargin: {
+                        if (Config.options?.overview?.centerLauncher ?? false)
+                            return 0;
                         const ov = Config?.options?.overview;
                         const base = (ov && ov.topMargin !== undefined) ? ov.topMargin : 0;
                         const respectBar = ov && ov.respectBar !== undefined ? ov.respectBar : true;
-                        if (respectBar && !Config.options.bar.bottom) {
+                        let margin = base;
+
+                        if (respectBar && !(Config.options?.bar?.bottom ?? false)) {
                             const barH = Appearance.sizes.barHeight + Appearance.rounding.screenRounding;
-                            return barH + base;
+                            margin += barH;
                         }
-                        return base;
+
+                        const dock = Config.options?.dock;
+                        if (dock?.enable && dock?.position === "top") {
+                            margin += (dock.height ?? 60) + 20;
+                        }
+
+                        return margin;
                     }
                     bottomMargin: {
+                        if (Config.options?.overview?.centerLauncher ?? false)
+                            return 0;
                         const ov = Config?.options?.overview;
                         const base = (ov && ov.bottomMargin !== undefined) ? ov.bottomMargin : 0;
                         const respectBar = ov && ov.respectBar !== undefined ? ov.respectBar : true;
                         let margin = base;
                         
                         // Respect bar at bottom
-                        if (respectBar && Config.options.bar.bottom) {
+                        if (respectBar && (Config.options?.bar?.bottom ?? false)) {
                             const barH = Appearance.sizes.barHeight + Appearance.rounding.screenRounding;
                             margin += barH;
                         }
@@ -212,9 +225,11 @@ Scope {
                         // Respect dock at bottom (if enabled)
                         const dock = Config.options?.dock;
                         if (dock?.enable && dock?.position === "bottom") {
-                            const dockH = (dock.height ?? 60) + 16; // dock height + margin
+                            const dockH = (dock.height ?? 60) + 20; // dock height + breathing space
                             margin += dockH;
                         }
+
+                        margin += 8; // keep overview cards from touching panel edges
                         
                         return margin;
                     }
