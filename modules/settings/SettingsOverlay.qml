@@ -592,13 +592,6 @@ Scope {
                 target: settingsCard
             }
 
-            // ── Corner fill for solid styles (rounded corners reveal wallpaper) ──
-            Rectangle {
-                anchors.fill: settingsCard
-                color: settingsCard.color
-                visible: !Appearance.auroraEverywhere
-            }
-
             // ── Floating settings card ──
             Rectangle {
                 id: settingsCard
@@ -613,9 +606,10 @@ Scope {
                 radius: Appearance.angelEverywhere ? Appearance.angel.roundingLarge
                       : Appearance.inirEverywhere ? Appearance.inir.roundingLarge
                       : Appearance.rounding.windowRounding
+                // backgroundOpacity only applies to glass styles (aurora/angel) — solid styles stay opaque
                 color: Appearance.auroraEverywhere ? "transparent"
-                     : Appearance.inirEverywhere ? CF.ColorUtils.applyAlpha(Appearance.inir.colLayer0, panelBgOpacity)
-                     : CF.ColorUtils.applyAlpha(Appearance.m3colors.m3background, panelBgOpacity)
+                     : Appearance.inirEverywhere ? Appearance.inir.colLayer0
+                     : Appearance.m3colors.m3background
                 clip: true
 
                 border.width: Appearance.angelEverywhere ? Appearance.angel.panelBorderWidth

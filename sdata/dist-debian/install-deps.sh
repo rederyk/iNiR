@@ -990,7 +990,10 @@ if ! command -v awww &>/dev/null; then
   else
     log_warning "Failed to clone awww repository"
   fi
-fi (Wayland color picker - compile from source)
+fi
+
+#####################################################################################
+# Install hyprpicker (Wayland color picker - compile from source)
 #####################################################################################
 tui_info "Installing hyprpicker..."
 
