@@ -96,7 +96,8 @@ cmake -B build -G Ninja \
     -DINSTALL_QMLDIR="$QML_DIR" \
     -DDISTRIBUTOR="iNiR build script" \
     -DUSE_JEMALLOC=OFF \
-    -DCRASH_REPORTER=OFF
+    -DCRASH_REPORTER=OFF \
+    -DCRASH_HANDLER=OFF
 
 # ── Build ─────────────────────────────────────────────
 echo "[4/5] Building (this takes a few minutes)..."

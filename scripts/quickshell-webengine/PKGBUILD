@@ -3,7 +3,7 @@
 # Based on the official CachyOS quickshell-git PKGBUILD with two changes:
 #   1. qArgC = 1 (Chromium requires argv[0])
 #   2. WebEngine init via pragma EnableQtWebEngineQuick
-#   3. Build flags: -DUSE_JEMALLOC=OFF -DCRASH_REPORTER=OFF
+#   3. Build flags: -DUSE_JEMALLOC=OFF -DCRASH_HANDLER=OFF
 
 pkgname=quickshell-webengine-git
 pkgver=0.2.1.r0
@@ -110,7 +110,8 @@ build() {
         -DINSTALL_QMLDIR=/usr/lib/qt6/qml \
         -DDISTRIBUTOR="iNiR PKGBUILD (quickshell-webengine-git)" \
         -DUSE_JEMALLOC=OFF \
-        -DCRASH_REPORTER=OFF
+        -DCRASH_REPORTER=OFF \
+        -DCRASH_HANDLER=OFF
     cmake --build build
 }
 
