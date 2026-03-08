@@ -8,7 +8,7 @@
 .mcp.json
 .zed/
 
-# AI/Dev agents (personal - not distributed)
+# Personal AI/dev tooling and local-only artifacts
 agents/
 .kiro/
 .opencode/
@@ -20,11 +20,15 @@ agents/
 .roo/
 .dory/
 inir-docs/
+inir-mcp/
 context-architect/
-AGENTS.md*
-**/AGENTS.md*
-CLAUDE.md*
-**/CLAUDE.md*
+AGENTS.md
+**/AGENTS.md
+**/AGENTS.md.bak
+CLAUDE.md
+**/CLAUDE.md
+CLAUDE.md.bak
+**/CLAUDE.md.bak
 GEMINI.md*
 Session.md*
 opencode.json
@@ -33,6 +37,7 @@ prompts/
 mcp.json
 .cursorrules
 .windsurfrules
+.windsurf/
 .memory/
 
 # WIP documentation (not for distribution)
@@ -47,6 +52,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+.ruff_cache/
 
 # Node
 node_modules/
@@ -101,7 +107,6 @@ Thumbs.db
 .orchids/
 .aider*
 .kilocode/
-.windsurf/
 .omc/
 .task/
 .opencode

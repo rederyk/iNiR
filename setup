@@ -758,6 +758,28 @@ MATUGEN_SDDM_EOF
         fi
     fi
 
+    # Install default WebApp plugins for existing users
+    if [[ -d "${REPO_ROOT}/defaults/plugins" ]]; then
+        local plugins_dir="${XDG_CONFIG_HOME}/illogical-impulse/plugins"
+        mkdir -p "$plugins_dir"
+        local new_plugins=0
+        for plugin_src in "${REPO_ROOT}/defaults/plugins"/*/; do
+            local pname=$(basename "$plugin_src")
+            local pdest="${plugins_dir}/${pname}"
+            if [[ ! -d "$pdest" ]]; then
+                cp -r "$plugin_src" "$pdest"
+                ((new_plugins++))
+            else
+                # Update userscripts only (don't overwrite user manifest/icon)
+                if [[ -d "${plugin_src}scripts" ]]; then
+                    mkdir -p "${pdest}/scripts"
+                    cp -r "${plugin_src}scripts/"* "${pdest}/scripts/" 2>/dev/null || true
+                fi
+            fi
+        done
+        [[ $new_plugins -gt 0 ]] && tui_success "Installed $new_plugins default WebApp plugin(s)"
+    fi
+
     # Restart shell (only if we have access to the session)
     echo ""
     if [[ -n "$NIRI_SOCKET" ]] || [[ -n "$WAYLAND_DISPLAY" ]]; then
@@ -806,6 +828,75 @@ MATUGEN_SDDM_EOF
         fi
     else
         tui_success "All required commands available"
+    fi
+
+    # WebApp plugins: check if quickshell has WebEngine support
+    if [[ -d "${REPO_ROOT}/defaults/plugins" ]]; then
+        echo ""
+        tui_title "WebApp Plugins"
+        echo ""
+
+        local has_webengine=false
+        if pacman -Q qt6-webengine &>/dev/null 2>&1; then
+            has_webengine=true
+        elif dpkg -s qt6-webengine-dev &>/dev/null 2>&1; then
+            has_webengine=true
+        elif rpm -q qt6-qtwebengine-devel &>/dev/null 2>&1; then
+            has_webengine=true
+        fi
+
+        # Check if quickshell was compiled with our WebEngine patch
+        local qs_has_patch=false
+        if strings "$(which qs 2>/dev/null || echo /usr/bin/quickshell)" 2>/dev/null | grep -q "EnableQtWebEngineQuick" 2>/dev/null; then
+            qs_has_patch=true
+        fi
+
+        if $qs_has_patch; then
+            tui_success "Quickshell has WebEngine support"
+            tui_info "Enable Web Apps in Settings → Interface → Sidebars"
+        elif $has_webengine; then
+            tui_info "qt6-webengine is installed but quickshell needs to be recompiled"
+            tui_info "Web Apps (Discord, YouTube Music, etc.) require a patched quickshell"
+            if $ask; then
+                if tui_confirm "Build and install quickshell with WebEngine support?"; then
+                    echo ""
+                    local build_script="${REPO_ROOT}/scripts/quickshell-webengine/build-quickshell-webengine.sh"
+                    local pkgbuild_dir="${REPO_ROOT}/scripts/quickshell-webengine"
+                    if command -v makepkg >/dev/null 2>&1 && [[ -f "${pkgbuild_dir}/PKGBUILD" ]]; then
+                        tui_info "Building with PKGBUILD (Arch)..."
+                        (cd "$pkgbuild_dir" && makepkg -si --noconfirm) && tui_success "quickshell-webengine installed!" || tui_warn "Build failed — see errors above"
+                    elif [[ -f "$build_script" ]]; then
+                        tui_info "Building with generic script..."
+                        bash "$build_script" --install && tui_success "quickshell-webengine installed!" || tui_warn "Build failed — see errors above"
+                    fi
+                fi
+            else
+                tui_info "Run: cd ${REPO_ROOT}/scripts/quickshell-webengine && makepkg -si"
+            fi
+        else
+            tui_info "WebApp plugins available (Discord, YouTube Music with adblock)"
+            tui_info "Requires: qt6-webengine + patched quickshell"
+            if $ask; then
+                if tui_confirm "Install qt6-webengine and build patched quickshell?"; then
+                    echo ""
+                    if command -v pacman >/dev/null 2>&1; then
+                        tui_info "Installing qt6-webengine..."
+                        pkg_sudo pacman -S --needed --noconfirm qt6-webengine || true
+                    fi
+                    local build_script="${REPO_ROOT}/scripts/quickshell-webengine/build-quickshell-webengine.sh"
+                    local pkgbuild_dir="${REPO_ROOT}/scripts/quickshell-webengine"
+                    if command -v makepkg >/dev/null 2>&1 && [[ -f "${pkgbuild_dir}/PKGBUILD" ]]; then
+                        tui_info "Building quickshell with WebEngine..."
+                        (cd "$pkgbuild_dir" && makepkg -si --noconfirm) && tui_success "quickshell-webengine installed!" || tui_warn "Build failed — see errors above"
+                    elif [[ -f "$build_script" ]]; then
+                        bash "$build_script" --install && tui_success "quickshell-webengine installed!" || tui_warn "Build failed — see errors above"
+                    fi
+                fi
+            else
+                tui_info "To enable: pacman -S qt6-webengine"
+                tui_info "Then: cd ${REPO_ROOT}/scripts/quickshell-webengine && makepkg -si"
+            fi
+        fi
     fi
 
     # Update Python venv packages
