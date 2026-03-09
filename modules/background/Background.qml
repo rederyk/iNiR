@@ -24,6 +24,10 @@ Variants {
     id: root
     model: Quickshell.screens
 
+    // Shared cache for magick identify results across all monitor instances.
+    // Avoids re-running the subprocess for previously-seen wallpapers.
+    property var _wallpaperSizeCache: ({})
+
     PanelWindow {
         id: bgRoot
 
@@ -124,7 +128,7 @@ Variants {
             return (GlobalStates.screenLocked && shouldBlur) ? Appearance.colors.colOnLayer0 : CF.ColorUtils.colorWithLightness(Appearance.colors.colPrimary, (dominantColorIsDark ? 0.8 : 0.12));
         }
         Behavior on colText {
-            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+            animation: ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
         }
 
         // Dynamic focus based on windows
@@ -150,7 +154,7 @@ Variants {
         property real focusPresenceProgress: focusWindowsPresent ? 1 : 0
         Behavior on focusPresenceProgress {
             enabled: Appearance.animationsEnabled
-            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            animation: NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
         }
 
         property real blurProgress: {
@@ -173,7 +177,7 @@ Variants {
             return CF.ColorUtils.mix(Appearance.colors.colLayer0, Appearance.colors.colPrimary, 0.75);
         }
         Behavior on color {
-            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+            animation: ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
         }
 
         onWallpaperPathChanged: bgRoot.updateZoomScale()
@@ -194,6 +198,24 @@ Variants {
                 if (!bgRoot.wallpaperPath || bgRoot.wallpaperPath.length === 0) return;
                 if (bgRoot.wallpaperIsVideo) return;
                 if (bgRoot.wallpaperSafetyTriggered) return;
+
+                // Check shared cache before spawning a subprocess
+                const cached = root._wallpaperSizeCache[bgRoot.wallpaperPath]
+                if (cached) {
+                    bgRoot.wallpaperWidth = cached.width
+                    bgRoot.wallpaperHeight = cached.height
+                    const screenWidth = bgRoot.screen?.width ?? 0
+                    const screenHeight = bgRoot.screen?.height ?? 0
+                    if (screenWidth > 0 && screenHeight > 0) {
+                        if (cached.width <= screenWidth || cached.height <= screenHeight) {
+                            bgRoot.effectiveWallpaperScale = Math.max(screenWidth / cached.width, screenHeight / cached.height)
+                        } else {
+                            bgRoot.effectiveWallpaperScale = Math.min(bgRoot.preferredWallpaperScale, cached.width / screenWidth, cached.height / screenHeight)
+                        }
+                    }
+                    return
+                }
+
                 getWallpaperSizeProc.path = bgRoot.wallpaperPath;
                 getWallpaperSizeProc.running = true;
             }
@@ -220,6 +242,11 @@ Variants {
 
                     bgRoot.wallpaperWidth = Math.round(width);
                     bgRoot.wallpaperHeight = Math.round(height);
+
+                    // Cache the result so subsequent switches to this wallpaper skip magick identify
+                    const cache = Object.assign({}, root._wallpaperSizeCache)
+                    cache[getWallpaperSizeProc.path] = { width: Math.round(width), height: Math.round(height) }
+                    root._wallpaperSizeCache = cache
 
                     if (width <= screenWidth || height <= screenHeight) {
                         bgRoot.effectiveWallpaperScale = Math.max(screenWidth / width, screenHeight / height);
@@ -279,11 +306,11 @@ Variants {
                 y: targetY
                 Behavior on x {
                     enabled: Appearance.animationsEnabled && wallpaperContainer.useParallax
-                    animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+                    animation: NumberAnimation { duration: Appearance.animation.elementMove.duration; easing.type: Appearance.animation.elementMove.type; easing.bezierCurve: Appearance.animation.elementMove.bezierCurve }
                 }
                 Behavior on y {
                     enabled: Appearance.animationsEnabled && wallpaperContainer.useParallax
-                    animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+                    animation: NumberAnimation { duration: Appearance.animation.elementMove.duration; easing.type: Appearance.animation.elementMove.type; easing.bezierCurve: Appearance.animation.elementMove.bezierCurve }
                 }
                 width: targetWidth
                 height: targetHeight
@@ -345,9 +372,9 @@ Variants {
                     opacity: (status === AnimatedImage.Ready && bgRoot.wallpaperIsGif) ? 1 : 0
                     Behavior on opacity {
                         enabled: Appearance.animationsEnabled
-                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                        animation: NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
                     }
-                    cache: true
+                    cache: false
                     playing: visible && bgRoot.enableAnimation && !GlobalStates.screenLocked && !Appearance._gameModeActive
                     asynchronous: true
                     source: (bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsGif) ? "" : bgRoot.wallpaperPathRaw
@@ -364,7 +391,7 @@ Variants {
                     opacity: bgRoot.wallpaperIsVideo ? 1 : 0
                     Behavior on opacity {
                         enabled: Appearance.animationsEnabled
-                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                        animation: NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
                     }
                     source: {
                         if (bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsVideo) return "";
@@ -506,7 +533,7 @@ Variants {
                 }
                 Behavior on color {
                     enabled: Appearance.animationsEnabled
-                    animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                    animation: ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
                 }
             }
 
@@ -562,8 +589,8 @@ Variants {
                     readonly property real parallaxFactor: bgRoot.parallaxOptions.widgetsFactor ?? 1
                     leftMargin: useParallax ? (bgRoot.movableXSpace - (wallpaperContainer.effectiveValueX * 2 * bgRoot.movableXSpace) * (parallaxFactor - 1)) : 0
                     topMargin: useParallax ? (bgRoot.movableYSpace - (wallpaperContainer.effectiveValueY * 2 * bgRoot.movableYSpace) * (parallaxFactor - 1)) : 0
-                    Behavior on leftMargin { animation: Appearance.animation.elementMove.numberAnimation.createObject(this) }
-                    Behavior on topMargin { animation: Appearance.animation.elementMove.numberAnimation.createObject(this) }
+                    Behavior on leftMargin { animation: NumberAnimation { duration: Appearance.animation.elementMove.duration; easing.type: Appearance.animation.elementMove.type; easing.bezierCurve: Appearance.animation.elementMove.bezierCurve } }
+                    Behavior on topMargin { animation: NumberAnimation { duration: Appearance.animation.elementMove.duration; easing.type: Appearance.animation.elementMove.type; easing.bezierCurve: Appearance.animation.elementMove.bezierCurve } }
                 }
                 width: useParallax ? wallpaperContainer.width : parent.width
                 height: useParallax ? wallpaperContainer.height : parent.height
