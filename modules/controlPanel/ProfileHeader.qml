@@ -26,6 +26,17 @@ Item {
         return Translation.tr("Good Evening")
     }
 
+    function openAccountSettings(): void {
+        const cmd = Config.options?.apps?.manageUser ?? "kcmshell6 kcm_users"
+        ShellExec.execCmd(cmd)
+        GlobalStates.controlPanelOpen = false
+    }
+
+    function lockScreen(): void {
+        GlobalStates.controlPanelOpen = false
+        Quickshell.execDetached(["/usr/bin/qs", "-c", "ii", "ipc", "call", "lock", "activate"])
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: 12
@@ -76,7 +87,10 @@ Item {
                     
                     onStatusChanged: {
                         if (status === Image.Error) {
-                            source = `file://${Directories.userAvatarPathAccountsService}`
+                            if (String(source).indexOf(Directories.userAvatarPathAccountsService) >= 0)
+                                source = `file://${Directories.userAvatarPathRicersAndWeirdSystems2}`
+                            else
+                                source = `file://${Directories.userAvatarPathAccountsService}`
                         }
                     }
                 }
@@ -123,7 +137,7 @@ Item {
                      : Appearance.colors.colPrimary
             }
             StyledText {
-                text: SystemInfo.username
+                text: SystemInfo.displayName || SystemInfo.username
                 font.pixelSize: Appearance.font.pixelSize.normal
                 font.weight: Font.Medium
                 font.capitalization: Font.Capitalize
@@ -150,10 +164,7 @@ Item {
                                   : root.inirEverywhere ? Appearance.inir.colLayer2Hover 
                                   : root.auroraEverywhere ? Appearance.aurora.colSubSurfaceHover
                                   : Appearance.colors.colLayer2Hover
-                onClicked: {
-                    GlobalStates.controlPanelOpen = false
-                    lockProc.running = true
-                }
+                onClicked: root.lockScreen()
                 contentItem: MaterialSymbol { 
                     anchors.centerIn: parent
                     text: "lock"
@@ -165,7 +176,30 @@ Item {
                 }
                 StyledToolTip { text: Translation.tr("Lock") }
             }
-            
+
+            RippleButton {
+                implicitWidth: 32
+                implicitHeight: 32
+                buttonRadius: Appearance.angelEverywhere ? Appearance.angel.roundingSmall
+                            : root.inirEverywhere ? Appearance.inir.roundingSmall : Appearance.rounding.full
+                colBackground: "transparent"
+                colBackgroundHover: Appearance.angelEverywhere ? Appearance.angel.colGlassCardHover
+                                  : root.inirEverywhere ? Appearance.inir.colLayer2Hover 
+                                  : root.auroraEverywhere ? Appearance.aurora.colSubSurfaceHover
+                                  : Appearance.colors.colLayer2Hover
+                onClicked: root.openAccountSettings()
+                contentItem: MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "manage_accounts"
+                    iconSize: 18
+                    color: Appearance.angelEverywhere ? Appearance.angel.colText
+                         : root.inirEverywhere ? Appearance.inir.colText
+                         : root.auroraEverywhere ? Appearance.m3colors.m3onSurface
+                         : Appearance.colors.colOnLayer0
+                }
+                StyledToolTip { text: Translation.tr("Manage my account") }
+            }
+
             RippleButton {
                 implicitWidth: 32
                 implicitHeight: 32
@@ -216,8 +250,4 @@ Item {
         }
     }
 
-    Process {
-        id: lockProc
-        command: ["/usr/bin/qs", "-c", "ii", "ipc", "call", "lock", "activate"]
-    }
 }

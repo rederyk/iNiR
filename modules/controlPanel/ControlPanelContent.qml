@@ -26,10 +26,11 @@ Item {
     readonly property bool auroraEverywhere: Appearance.auroraEverywhere
     
     readonly property string wallpaperUrl: Wallpapers.effectiveWallpaperUrl
+    readonly property bool useWallpaperBackdrop: root.auroraEverywhere && !root.inirEverywhere && !Appearance.gameModeMinimal && root.wallpaperUrl.length > 0
     
     ColorQuantizer {
         id: wallpaperColorQuantizer
-        source: root.wallpaperUrl
+        source: root.useWallpaperBackdrop ? root.wallpaperUrl : ""
         depth: 0
         rescaleSize: 10
     }
@@ -68,7 +69,7 @@ Item {
         
         clip: true
 
-        layer.enabled: root.auroraEverywhere && !root.inirEverywhere && !Appearance.gameModeMinimal
+        layer.enabled: root.useWallpaperBackdrop
         layer.effect: GE.OpacityMask {
             maskSource: Rectangle {
                 width: background.width
@@ -83,13 +84,13 @@ Item {
             anchors.centerIn: parent
             width: root.screenWidth
             height: root.screenHeight
-            visible: root.auroraEverywhere && !root.inirEverywhere && !Appearance.gameModeMinimal
-            source: root.wallpaperUrl
+            visible: root.useWallpaperBackdrop
+            source: root.useWallpaperBackdrop ? root.wallpaperUrl : ""
             fillMode: Image.PreserveAspectCrop
             cache: true
             asynchronous: true
 
-            layer.enabled: Appearance.effectsEnabled
+            layer.enabled: root.useWallpaperBackdrop && Appearance.effectsEnabled
             layer.effect: MultiEffect {
                 source: blurredWallpaper
                 anchors.fill: source

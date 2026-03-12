@@ -11,6 +11,7 @@ import Quickshell.Hyprland
 Scope {
     id: root
     property int sidebarWidth: Appearance.sizes.sidebarWidth
+    readonly property bool instantOpen: Config.options?.sidebar?.instantOpen ?? false
     // Expanded width when a webapp is active
     property bool pluginViewActive: false
     // Track transitions to disable width animation during webapp open/close
@@ -39,6 +40,9 @@ Scope {
                 if (GlobalStates.sidebarLeftOpen) {
                     _closeTimer.stop()
                     sidebarRoot.visible = true
+                } else if (root.instantOpen || !Appearance.animationsEnabled) {
+                    _closeTimer.stop()
+                    sidebarRoot.visible = false
                 } else {
                     _closeTimer.restart()
                 }
@@ -115,9 +119,9 @@ Scope {
             transform: Translate {
                 x: GlobalStates.sidebarLeftOpen ? 0 : -(root.effectiveSidebarWidth + Appearance.sizes.hyprlandGapsOut)
                 Behavior on x {
-                    enabled: Appearance.animationsEnabled && !root._pluginTransitioning
+                    enabled: Appearance.animationsEnabled && !root._pluginTransitioning && !root.instantOpen
                     NumberAnimation {
-                        duration: 250
+                        duration: Appearance.calcEffectiveDuration(250)
                         easing.type: Easing.OutCubic
                         onRunningChanged: sidebarContentLoader.animating = running
                     }
