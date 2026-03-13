@@ -111,6 +111,7 @@ Item {
     Component.onDestruction: PackageSearch.clear()
 
     signal actionExecuted()
+    signal returnToSearch()
 
     implicitWidth: mainColumn.implicitWidth
     implicitHeight: mainColumn.implicitHeight
@@ -122,10 +123,10 @@ Item {
         }
     }
 
-    function _executePackageAction(pkg): void {
+    function _executePackageActionStatic(pkg, isRemove): void {
         const terminal = Config.options?.apps?.terminal ?? "kitty"
         const name = pkg.name
-        if (root.isPackageRemove) {
+        if (isRemove) {
             Quickshell.execDetached(["/usr/bin/bash", "-c",
                 `${terminal} -e /usr/bin/bash -c 'sudo pacman -Rns ${name} ; echo "\\nPress Enter to close..." ; read'`])
         } else {
@@ -136,7 +137,6 @@ Item {
             Quickshell.execDetached(["/usr/bin/bash", "-c",
                 `${terminal} -e /usr/bin/bash -c '${helper} ; echo "\\nPress Enter to close..." ; read'`])
         }
-        root.actionExecuted()
     }
 
     ColumnLayout {
@@ -152,7 +152,10 @@ Item {
         SecondaryTabBar {
             id: categoryTabBar
             Layout.fillWidth: true
-            Layout.topMargin: 4
+            Layout.topMargin: 8
+            Layout.leftMargin: 12
+            Layout.rightMargin: 12
+            indicatorPadding: 12
             currentIndex: root.selectedCategoryIndex
             onCurrentIndexChanged: root.selectedCategoryIndex = currentIndex
 
@@ -268,30 +271,16 @@ Item {
 
                 onClicked: {
                     // Capture values before closing overview (which destroys this component)
-                    const isPkgQuery = root.isPackageQuery
-                    const pkgQuery = root.packageQuery
-                    const query = root.query
-                    const isPkgRemove = root.isPackageRemove
-                    const actionFn = isAction ? entry.action?.execute : null
-                    const pkg = isPackage ? entry.pkg : null
+                    const capturedAction = isAction ? entry.action : null
+                    const capturedPkg = isPackage ? entry.pkg : null
+                    const capturedArgs = root.isPackageQuery ? root.packageQuery : root.query
+                    const capturedIsRemove = root.isPackageRemove
                     root.actionExecuted()
                     GlobalStates.overviewOpen = false
-                    if (isAction && actionFn) {
-                        const args = isPkgQuery ? pkgQuery : query
-                        actionFn(args)
-                    } else if (isPackage && pkg) {
-                        const terminal = Config.options?.apps?.terminal ?? "kitty"
-                        const name = pkg.name
-                        if (isPkgRemove) {
-                            Quickshell.execDetached(["/usr/bin/bash", "-c",
-                                `${terminal} -e /usr/bin/bash -c 'sudo pacman -Rns ${name} ; echo "\\nPress Enter to close..." ; read'`])
-                        } else {
-                            const helper = pkg.isAur
-                                ? "if command -v yay &>/dev/null; then yay -S " + name + "; elif command -v paru &>/dev/null; then paru -S " + name + "; else echo 'No AUR helper found'; fi"
-                                : "sudo pacman -S " + name
-                            Quickshell.execDetached(["/usr/bin/bash", "-c",
-                                `${terminal} -e /usr/bin/bash -c '${helper} ; echo "\\nPress Enter to close..." ; read'`])
-                        }
+                    if (capturedAction?.execute) {
+                        capturedAction.execute(capturedArgs)
+                    } else if (capturedPkg) {
+                        root._executePackageActionStatic(capturedPkg, capturedIsRemove)
                     }
                 }
 
@@ -305,6 +294,12 @@ Item {
                         event.accepted = true
                     } else if (event.key === Qt.Key_Backtab || event.key === Qt.Key_Left) {
                         root.selectedCategoryIndex = (root.selectedCategoryIndex - 1 + root.categoryList.length) % root.categoryList.length
+                        event.accepted = true
+                    } else if (event.key === Qt.Key_Up && actionList.currentIndex === 0) {
+                        root.returnToSearch()
+                        event.accepted = true
+                    } else if (event.key === Qt.Key_Escape) {
+                        GlobalStates.overviewOpen = false
                         event.accepted = true
                     }
                 }
@@ -500,6 +495,51 @@ Item {
                 text: Translation.tr("No results for \"%1\"").arg(root.query)
                 font.pixelSize: Appearance.font.pixelSize.small
                 color: Appearance.colors.colSubtext
+            }
+        }
+
+        // ── Keyboard hints footer ──
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 4
+            Layout.bottomMargin: 6
+            Layout.leftMargin: 20
+            Layout.rightMargin: 20
+            spacing: 16
+            opacity: 0.5
+
+            Repeater {
+                model: [
+                    { key: "↑↓", hint: Translation.tr("Navigate") },
+                    { key: "↵",  hint: Translation.tr("Run") },
+                    { key: "Tab", hint: Translation.tr("Category") },
+                    { key: "←→", hint: Translation.tr("Category") },
+                    { key: "Esc", hint: Translation.tr("Close") },
+                ]
+                delegate: RowLayout {
+                    spacing: 3
+                    Rectangle {
+                        implicitWidth: keyLabel.implicitWidth + 8
+                        implicitHeight: keyLabel.implicitHeight + 4
+                        radius: 4
+                        color: Appearance.inirEverywhere ? Appearance.inir.colLayer2
+                            : Appearance.angelEverywhere ? Appearance.angel.colGlassCard
+                            : Appearance.colors.colSecondaryContainer
+                        StyledText {
+                            id: keyLabel
+                            anchors.centerIn: parent
+                            text: modelData.key
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            font.family: Appearance.font.family.monospace
+                            color: Appearance.m3colors.m3onSurface
+                        }
+                    }
+                    StyledText {
+                        text: modelData.hint
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        color: Appearance.colors.colSubtext
+                    }
+                }
             }
         }
     }

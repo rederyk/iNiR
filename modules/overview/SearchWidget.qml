@@ -420,6 +420,7 @@ Item { // Wrapper
                 visible: root.actionMode && root.showResults
                 query: root.actionQuery
                 onActionExecuted: GlobalStates.overviewOpen = false
+                onReturnToSearch: root.focusSearchInput()
             }
 
             ListView { // App results
