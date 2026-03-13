@@ -585,7 +585,7 @@ Item {
               : (Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1)
         clip: true
 
-        layer.enabled: auroraEverywhere && !inirEverywhere && !gameModeMinimal
+        layer.enabled: !gameModeMinimal
         layer.effect: GE.OpacityMask {
             maskSource: Rectangle {
                 width: bg.width; height: bg.height; radius: bg.radius

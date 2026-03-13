@@ -171,7 +171,7 @@ ContentPage {
                 RippleButtonWithIcon {
                     materialIcon: "auto_stories"
                     mainText: Translation.tr("Documentation")
-                    onClicked: Qt.openUrlExternally("https://github.com/snowarch/inir/tree/main/docs")
+                    onClicked: Qt.openUrlExternally("https://snowarch.github.io/iNiR/docs/")
                 }
                 RippleButtonWithIcon {
                     materialIcon: "bug_report"
