@@ -498,6 +498,11 @@ MouseArea {
                         sourceSize.width: avatarCircle.width * 2
                         sourceSize.height: avatarCircle.height * 2
                         visible: status === Image.Ready && avatarImage.status !== Image.Ready
+                        onStatusChanged: {
+                            if (status === Image.Error) {
+                                source = `file://${Directories.userAvatarPathRicersAndWeirdSystems2}`
+                            }
+                        }
                         
                         layer.enabled: Appearance.effectsEnabled
                         layer.effect: OpacityMask {
@@ -512,7 +517,7 @@ MouseArea {
                     // Fallback initial
                     Text {
                         anchors.centerIn: parent
-                        text: SystemInfo.username.charAt(0).toUpperCase()
+                        text: (SystemInfo.displayName || SystemInfo.username || "?").charAt(0).toUpperCase()
                         font.pixelSize: Math.round(40 * Appearance.fontSizeScale)
                         font.weight: Font.Medium
                         color: Appearance.colors.colOnPrimary
@@ -568,7 +573,7 @@ MouseArea {
                 transform: Translate { x: passwordContainer.shakeOffset; y: passwordContainer.staggerY }
                 
                 Behavior on border.color {
-                    animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                    animation: ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
                 }
                 
                 layer.enabled: Appearance.effectsEnabled
@@ -677,7 +682,7 @@ MouseArea {
                                 : Appearance.colors.colPrimary
                         
                         Behavior on color {
-                            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                            animation: ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
                         }
                         
                         MaterialSymbol {
@@ -1097,7 +1102,7 @@ MouseArea {
         }
         
         Behavior on color {
-            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+            animation: ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
         }
         
         layer.enabled: Appearance.effectsEnabled

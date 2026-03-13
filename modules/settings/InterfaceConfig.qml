@@ -1502,6 +1502,16 @@ ContentPage {
             }
 
             SettingsSwitch {
+                buttonIcon: "animation"
+                text: Translation.tr("Instant sidebar opening")
+                checked: Config.options.sidebar?.instantOpen ?? false
+                onCheckedChanged: Config.setNestedValue("sidebar.instantOpen", checked)
+                StyledToolTip {
+                    text: Translation.tr("Disable the sidebar slide animation and open or close it instantly to reduce stutter under load")
+                }
+            }
+
+            SettingsSwitch {
                 buttonIcon: "folder_open"
                 text: Translation.tr("Open folder after wallpaper download")
                 checked: Config.options.sidebar?.openFolderOnDownload ?? false
@@ -2297,7 +2307,7 @@ ContentPage {
                                 color: itemHover.containsMouse ? Appearance.colors.colLayer2Hover : "transparent"
                                 Behavior on color {
                                     enabled: Appearance.animationsEnabled
-                                    animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                                    animation: ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
                                 }
                             }
 

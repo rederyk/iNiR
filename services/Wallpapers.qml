@@ -16,8 +16,12 @@ Singleton {
     id: root
 
     readonly property bool _debugWallpaperUrls: (Quickshell.env("INIR_DEBUG_WALLPAPER_URLS") ?? "") === "1"
-    readonly property string backendProvider: Config.options?.background?.backend?.provider ?? "internal"
-    readonly property bool awwwBackendEnabled: backendProvider === "awww"
+
+    // Suppression flag: prevents ThemeService from firing a duplicate
+    // switchwall.sh run while a direct apply() is already in progress.
+    property bool _applyInProgress: false
+    readonly property string backendProvider: "awww"
+    readonly property bool awwwBackendEnabled: true
 
     // Wallpaper path resolution for aurora/backdrop
     readonly property bool isWaffleFamily: (Config.options?.panelFamily ?? "ii") === "waffle"
@@ -53,14 +57,15 @@ Singleton {
                 return (waffleBackdrop.useMainWallpaper ?? true) ? waffleMain : (waffleBackdrop.wallpaperPath || waffleMain)
             }
 
+            const iiBackdrop = Config.options?.background?.backdrop ?? {}
+            if (iiBackdrop.useMainWallpaper ?? true)
+                return mainPath
             if (WallpaperListener.multiMonitorEnabled && targetMonitor) {
                 const monitorData = WallpaperListener.effectivePerMonitor[targetMonitor] ?? null
                 if (monitorData && monitorData.backdropPath)
                     return monitorData.backdropPath
             }
-
-            const iiBackdrop = Config.options?.background?.backdrop ?? {}
-            return (iiBackdrop.useMainWallpaper ?? true) ? mainPath : (iiBackdrop.wallpaperPath || mainPath)
+            return iiBackdrop.wallpaperPath || mainPath
         }
 
         if (root.isWaffleFamily) {
@@ -96,6 +101,16 @@ Singleton {
             console.log("[Wallpapers] effectiveWallpaperPath=", root.effectiveWallpaperPath)
             console.log("[Wallpapers] effectiveWallpaperUrl=", root.effectiveWallpaperUrl)
         }
+        // Schedule a deferred GC pass to reclaim orphaned pixmaps/textures
+        // from the previous wallpaper.  The delay gives the scene graph one
+        // frame to drop references before we collect.
+        _gcTimer.restart()
+    }
+
+    Timer {
+        id: _gcTimer
+        interval: 2000
+        onTriggered: gc()
     }
 
     // ── Video first-frame system ──────────────────────────────────────────
@@ -268,13 +283,16 @@ Singleton {
 
         switch (normalizedTarget) {
         case "backdrop": {
+            const iiBackdrop = Config.options?.background?.backdrop ?? {}
+            const useMainWallpaper = iiBackdrop.useMainWallpaper ?? true
+            if (useMainWallpaper)
+                return mainPath
             if (WallpaperListener.multiMonitorEnabled && monitorName) {
                 const monitorData = WallpaperListener.effectivePerMonitor[monitorName] ?? null
                 if (monitorData && monitorData.backdropPath)
                     return monitorData.backdropPath
             }
-            const iiBackdrop = Config.options?.background?.backdrop ?? {}
-            return (iiBackdrop.useMainWallpaper ?? true) ? mainPath : (iiBackdrop.wallpaperPath || mainPath)
+            return iiBackdrop.wallpaperPath || mainPath
         }
         case "waffle": {
             const waffleBackground = Config.options?.waffles?.background ?? {}
@@ -298,9 +316,62 @@ Singleton {
     }
 
     Process { id: applyProc }
-    
+
+    // Clears _applyInProgress after switchwall.sh has had time to start.
+    // 3 seconds is enough for the script to begin; ThemeService debounce is 260ms.
+    Timer {
+        id: _applySuppressTimer
+        interval: 3000
+        onTriggered: root._applyInProgress = false
+    }
+
     function openFallbackPicker(darkMode = Appearance.m3colors.darkmode) {
         applyProc.exec([Directories.wallpaperSwitchScriptPath, "--mode", (darkMode ? "dark" : "light")])
+    }
+
+    function applySelectionTarget(path, target = "main", darkMode = Appearance.m3colors.darkmode, monitorName = "") {
+        const normalizedPath = FileUtils.trimFileProtocol(String(path ?? ""))
+        if (!normalizedPath || normalizedPath.length === 0) return
+
+        const normalizedTarget = target && target.length > 0 ? target : "main"
+        const lowerPath = normalizedPath.toLowerCase()
+        const isVideo = lowerPath.endsWith(".mp4") || lowerPath.endsWith(".webm") || lowerPath.endsWith(".mkv")
+            || lowerPath.endsWith(".avi") || lowerPath.endsWith(".mov")
+        const isGif = lowerPath.endsWith(".gif")
+        const needsThumbnail = isVideo || isGif
+        const thumbnailPath = needsThumbnail ? root.getExpectedThumbnailPath(normalizedPath, "large") : ""
+
+        switch (normalizedTarget) {
+        case "backdrop":
+            Config.setNestedValue("background.backdrop.useMainWallpaper", false)
+            Config.setNestedValue("background.backdrop.wallpaperPath", normalizedPath)
+            Config.setNestedValue("background.backdrop.thumbnailPath", thumbnailPath)
+            if (needsThumbnail)
+                root.ensureThumbnailForPath(normalizedPath, "large")
+            if (Config.options?.appearance?.wallpaperTheming?.useBackdropForColors)
+                Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--noswitch"])
+            root.changed()
+            return
+        case "waffle":
+            Config.setNestedValue("waffles.background.useMainWallpaper", false)
+            Config.setNestedValue("waffles.background.wallpaperPath", normalizedPath)
+            Config.setNestedValue("waffles.background.thumbnailPath", thumbnailPath)
+            if (needsThumbnail)
+                root.ensureThumbnailForPath(normalizedPath, "large")
+            root.changed()
+            return
+        case "waffle-backdrop":
+            Config.setNestedValue("waffles.background.backdrop.useMainWallpaper", false)
+            Config.setNestedValue("waffles.background.backdrop.wallpaperPath", normalizedPath)
+            Config.setNestedValue("waffles.background.backdrop.thumbnailPath", thumbnailPath)
+            if (needsThumbnail)
+                root.ensureThumbnailForPath(normalizedPath, "large")
+            root.changed()
+            return
+        default:
+            root.select(normalizedPath, darkMode, monitorName)
+            return
+        }
     }
 
     function apply(path, darkMode = Appearance.m3colors.darkmode, monitorName = "") {
@@ -316,6 +387,10 @@ Singleton {
         }
 
         if (applyProc.running) applyProc.running = false
+
+        // Suppress ThemeService duplicate regeneration while switchwall.sh runs
+        root._applyInProgress = true
+        _applySuppressTimer.restart()
 
         if (root.awwwBackendEnabled && AwwwBackend.supportsMainWallpaper(normalizedPath)) {
             Config.setNestedValue("background.wallpaperPath", normalizedPath)
@@ -341,8 +416,11 @@ Singleton {
     function updatePerMonitorConfig(path: string, monitorName: string) {
         const currentArray = Config.options?.background?.wallpapersByMonitor ?? []
         const newArray = []
+        let currentEntry = null
         for (const entry of currentArray) {
-            if (entry && entry.monitor !== monitorName) {
+            if (entry && entry.monitor === monitorName) {
+                currentEntry = entry
+            } else if (entry) {
                 newArray.push(entry)
             }
         }
@@ -353,12 +431,12 @@ Singleton {
             if (range) { wsFirst = range.first; wsLast = range.last }
         }
 
-        newArray.push({
+        newArray.push(Object.assign({}, currentEntry ?? {}, {
             monitor: monitorName,
             path: path,
             workspaceFirst: wsFirst,
             workspaceLast: wsLast
-        })
+        }))
 
         Config.setNestedValue("background.wallpapersByMonitor", newArray)
     }

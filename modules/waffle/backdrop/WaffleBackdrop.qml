@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import qs
 import qs.modules.common
+import qs.modules.common.widgets
 import qs.services
 import QtQuick
 import QtQuick.Effects
@@ -104,19 +105,23 @@ Variants {
         Item {
             anchors.fill: parent
 
-            // Static Image (non-GIF, non-video images only)
-            Image {
+            // Static wallpaper with crossfade transitions (shares waffle workspace transition settings)
+            WallpaperCrossfader {
                 id: wallpaper
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectCrop
                 source: backdropWindow.wallpaperUrl && !backdropWindow.wallpaperIsGif && !backdropWindow.wallpaperIsVideo
                     ? backdropWindow.wallpaperUrl
                     : ""
-                asynchronous: true
-                cache: true
+                sourceSize: Qt.size(backdropWindow.screen?.width ?? 1920, backdropWindow.screen?.height ?? 1080)
                 visible: !backdropWindow.wallpaperIsGif && !backdropWindow.wallpaperIsVideo
+                // Use waffle transition settings
+                transitionBaseDuration: Config.options?.waffles?.background?.transition?.duration ?? 800
+                transitionType: Config.options?.waffles?.background?.transition?.type ?? "crossfade"
+                transitionDirection: Config.options?.waffles?.background?.transition?.direction ?? "right"
+                enableTransitions: Config.options?.waffles?.background?.transition?.enable ?? true
             }
-            
+
             // Animated GIF wallpaper
             // Always loaded for GIFs: plays when animation enabled, frozen (first frame) when disabled
             AnimatedImage {
@@ -129,7 +134,9 @@ Variants {
                         : "file://" + backdropWindow.wallpaperPathRaw)
                     : ""
                 asynchronous: true
-                cache: true
+                cache: false
+                sourceSize.width: 480
+                sourceSize.height: 270
                 visible: backdropWindow.wallpaperIsGif
                 playing: visible && backdropWindow.enableAnimation
 
@@ -206,7 +213,7 @@ Variants {
             MultiEffect {
                 anchors.fill: parent
                 source: wallpaper
-                visible: wallpaper.status === Image.Ready && !backdropWindow.wallpaperIsGif && !backdropWindow.wallpaperIsVideo
+                visible: wallpaper.ready && !backdropWindow.wallpaperIsGif && !backdropWindow.wallpaperIsVideo
                 blurEnabled: backdropWindow.backdropBlurRadius > 0
                 blur: backdropWindow.backdropBlurRadius / 100.0
                 blurMax: 64

@@ -27,6 +27,7 @@ Scope {
     readonly property var focusedScreen: CompositorService.isNiri
         ? (Quickshell.screens.find(s => s.name === NiriService.currentOutput) ?? GlobalStates.primaryScreen)
         : (Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? GlobalStates.primaryScreen)
+    readonly property var defaultScreen: GlobalStates.primaryScreen ?? focusedScreen
 
     readonly property var targetScreen: {
         const targetMon = Config.options?.wallpaperSelector?.targetMonitor ?? ""
@@ -34,7 +35,7 @@ Scope {
             const s = Quickshell.screens.find(scr => scr.name === targetMon)
             if (s) return s
         }
-        return root.focusedScreen
+        return root.defaultScreen
     }
 
     // ─── View mode: "gallery" or "skew" ───
@@ -62,48 +63,7 @@ Scope {
             ? configTarget
             : GlobalStates.wallpaperSelectionTarget
 
-        // Video/GIF thumbnail handling
-        const lowerPath = normalizedPath.toLowerCase()
-        const isVideo = lowerPath.endsWith(".mp4") || lowerPath.endsWith(".webm")
-            || lowerPath.endsWith(".mkv") || lowerPath.endsWith(".avi") || lowerPath.endsWith(".mov")
-        const isGif = lowerPath.endsWith(".gif")
-        const needsThumbnail = isVideo || isGif
-
-        switch (target) {
-        case "backdrop":
-            Config.setNestedValue("background.backdrop.useMainWallpaper", false)
-            Config.setNestedValue("background.backdrop.wallpaperPath", normalizedPath)
-            if (needsThumbnail) {
-                Wallpapers.ensureThumbnailForPath(normalizedPath, "large")
-                const tp = Wallpapers.getExpectedThumbnailPath(normalizedPath, "large")
-                Config.setNestedValue("background.backdrop.thumbnailPath", tp)
-            }
-            if (Config.options?.appearance?.wallpaperTheming?.useBackdropForColors) {
-                Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--noswitch"])
-            }
-            break
-        case "waffle":
-            Config.setNestedValue("waffles.background.useMainWallpaper", false)
-            Config.setNestedValue("waffles.background.wallpaperPath", normalizedPath)
-            if (needsThumbnail) {
-                Wallpapers.ensureThumbnailForPath(normalizedPath, "large")
-                const tp = Wallpapers.getExpectedThumbnailPath(normalizedPath, "large")
-                Config.setNestedValue("waffles.background.thumbnailPath", tp)
-            }
-            break
-        case "waffle-backdrop":
-            Config.setNestedValue("waffles.background.backdrop.useMainWallpaper", false)
-            Config.setNestedValue("waffles.background.backdrop.wallpaperPath", normalizedPath)
-            if (needsThumbnail) {
-                Wallpapers.ensureThumbnailForPath(normalizedPath, "large")
-                const tp = Wallpapers.getExpectedThumbnailPath(normalizedPath, "large")
-                Config.setNestedValue("waffles.background.backdrop.thumbnailPath", tp)
-            }
-            break
-        default: // "main"
-            Wallpapers.select(normalizedPath, useDarkMode, root.selectedMonitor)
-            break
-        }
+        Wallpapers.applySelectionTarget(normalizedPath, target, useDarkMode, root.selectedMonitor)
 
         GlobalStates.wallpaperSelectionTarget = "main"
         GlobalStates.coverflowSelectorOpen = false

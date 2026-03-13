@@ -297,6 +297,7 @@ Singleton {
                     property bool enableVSCode: true
                     property bool enableChrome: true
                     property bool enableSpicetify: false
+                    property bool enableOpenCode: true
                     property JsonObject vscodeEditors: JsonObject {
                         property bool code: true           // Official VSCode
                         property bool codium: true         // VSCodium (FOSS)
@@ -325,6 +326,7 @@ Singleton {
                         property bool btop: true
                         property bool lazygit: true
                         property bool yazi: true
+                        property bool omp: true
                     }
                     property JsonObject terminalGenerationProps: JsonObject {
                         property real harmony: 0.6
@@ -495,8 +497,8 @@ Singleton {
                 property JsonObject effects: JsonObject {
                     property bool enableBlur: false
                     property int blurRadius: 32
-                    property int blurStatic: 0 // 0-100, blur mínimo incluso sin ventanas
-                    property int videoBlurStrength: 50
+                    property int thumbnailBlurStrength: 50
+                    property bool enableAnimatedBlur: false // Enable blur for animated wallpapers (video/gif) - has performance impact
                     property int dim: 0 // 0-100 percentage (base overlay)
                     property int dynamicDim: 0 // Extra dim when there are windows on the current workspace (0-100)
                     property JsonObject ripple: JsonObject {
@@ -522,9 +524,9 @@ Singleton {
                     property bool enableAnimation: false // Enable animated wallpapers (video/gif) in backdrop (disabled by default for performance)
                     property bool enableAnimatedBlur: false // Enable blur for animated wallpapers (video/gif) - has performance impact
                     property int blurRadius: 32
-                    property int dim: 35 // 0-100
-                    property real saturation: 1.0
-                    property real contrast: 1.0
+                    property int dim: 35
+                    property real saturation: 0
+                    property real contrast: 0
                     property bool vignetteEnabled: false
                     property real vignetteIntensity: 0.5
                     property real vignetteRadius: 0.7
@@ -550,7 +552,7 @@ Singleton {
                     property string folder: "" // empty = use current wallpaper folder
                 }
                 property JsonObject backend: JsonObject {
-                    property string provider: "internal"
+                    property string provider: "awww"
                     property JsonObject awww: JsonObject {
                         property int transitionFps: 60
                         property int simpleStep: 5
@@ -997,6 +999,7 @@ Singleton {
                 property string layout: "default" // "default" | "compact"
                 property bool keepRightSidebarLoaded: true
                 property bool keepLeftSidebarLoaded: true
+                property bool instantOpen: false
                 property bool openFolderOnDownload: false // Open file manager after wallpaper download
                 property JsonObject translator: JsonObject {
                     property bool enable: true
@@ -1317,10 +1320,15 @@ Singleton {
                     property bool useMainWallpaper: true
                     property bool enableAnimation: true // Enable animated wallpapers (video/gif)
                     property bool hideWhenFullscreen: true
+                    property JsonObject transition: JsonObject {
+                        property bool enable: true
+                        property string type: "crossfade"
+                        property string direction: "right"
+                        property int duration: 800
+                    }
                     property JsonObject effects: JsonObject {
                         property bool enableBlur: false
                         property int blurRadius: 32
-                        property int blurStatic: 0
                         property int dim: 0
                         property int dynamicDim: 0
                         property bool enableAnimatedBlur: false // Enable blur for animated wallpapers (video/gif) - has performance impact
@@ -1336,8 +1344,8 @@ Singleton {
                         property bool enableAnimatedBlur: false // Enable blur for animated wallpapers (video/gif) - has performance impact
                         property int blurRadius: 32
                         property int dim: 35
-                        property real saturation: 1.0
-                        property real contrast: 1.0
+                        property real saturation: 0
+                        property real contrast: 0
                         property bool vignetteEnabled: false
                         property real vignetteIntensity: 0.5
                         property real vignetteRadius: 0.7

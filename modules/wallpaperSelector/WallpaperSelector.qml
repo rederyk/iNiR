@@ -18,6 +18,8 @@ Scope {
         ? (Quickshell.screens.find(s => s.name === NiriService.currentOutput) ?? GlobalStates.primaryScreen)
         : (Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? GlobalStates.primaryScreen)
     readonly property string focusedMonitorName: focusedScreen?.name ?? ""
+    readonly property var defaultScreen: GlobalStates.primaryScreen ?? focusedScreen
+    readonly property string defaultMonitorName: defaultScreen?.name ?? focusedMonitorName
 
     property bool _pendingCoverflow: false
 
@@ -96,7 +98,7 @@ Scope {
                     const s = Quickshell.screens.find(s => s.name === targetMon)
                     if (s) return s
                 }
-                return root.focusedScreen
+                return root.defaultScreen
             }
             readonly property HyprlandMonitor monitor: CompositorService.isHyprland ? Hyprland.monitorFor(panelWindow.screen) : null
             property bool monitorIsFocused: CompositorService.isHyprland 
@@ -184,13 +186,13 @@ Scope {
             const multiMon = Config.options?.background?.multiMonitor?.enable ?? false
             const explicitMonitor = Config.options?.wallpaperSelector?.targetMonitor ?? ""
 
-            if (!explicitMonitor && multiMon && CompositorService.isNiri && !niriOutputDetector.running) {
+            if (!explicitMonitor && multiMon && !root.defaultMonitorName && CompositorService.isNiri && !niriOutputDetector.running) {
                 root._pendingCoverflow = true
                 niriOutputDetector.exec(["niri", "msg", "-j", "focused-output"])
                 return
             }
 
-            const monName = explicitMonitor || (multiMon ? root.focusedMonitorName : "")
+            const monName = explicitMonitor || (multiMon ? root.defaultMonitorName : "")
             root._toggleCoverflowWithMonitor(monName)
             return
         }
@@ -222,12 +224,11 @@ Scope {
             if (multiMon) {
                 // For Niri: query focused output asynchronously (NiriService.currentOutput
                 // can be stale after a previous PanelWindow changed compositor focus)
-                if (CompositorService.isNiri && !niriOutputDetector.running) {
+                if (CompositorService.isNiri && !root.defaultMonitorName && !niriOutputDetector.running) {
                     niriOutputDetector.exec(["niri", "msg", "-j", "focused-output"])
                     return
                 }
-                // Hyprland or fallback: use live binding (reliable)
-                _openWithMonitor(root.focusedMonitorName)
+                _openWithMonitor(root.defaultMonitorName)
                 return
             }
         } else if (explicitMonitor) {

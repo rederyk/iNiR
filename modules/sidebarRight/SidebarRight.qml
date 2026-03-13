@@ -11,6 +11,7 @@ import Quickshell.Hyprland
 Scope {
     id: root
     property int sidebarWidth: Appearance.sizes.sidebarWidth
+    readonly property bool instantOpen: Config.options?.sidebar?.instantOpen ?? false
 
     PanelWindow {
         id: sidebarRoot
@@ -23,6 +24,9 @@ Scope {
                 if (GlobalStates.sidebarRightOpen) {
                     _closeTimer.stop()
                     sidebarRoot.visible = true
+                } else if (root.instantOpen || !Appearance.animationsEnabled) {
+                    _closeTimer.stop()
+                    sidebarRoot.visible = false
                 } else {
                     _closeTimer.restart()
                 }
@@ -128,9 +132,9 @@ Scope {
             transform: Translate {
                 x: GlobalStates.sidebarRightOpen ? 0 : (sidebarWidth + Appearance.sizes.hyprlandGapsOut)
                 Behavior on x {
-                    enabled: Appearance.animationsEnabled
+                    enabled: Appearance.animationsEnabled && !root.instantOpen
                     NumberAnimation {
-                        duration: 250
+                        duration: Appearance.calcEffectiveDuration(250)
                         easing.type: Easing.OutCubic
                         onRunningChanged: sidebarContentLoader.animating = running
                     }

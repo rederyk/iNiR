@@ -26,10 +26,11 @@ Item {
     readonly property bool auroraEverywhere: Appearance.auroraEverywhere
     
     readonly property string wallpaperUrl: Wallpapers.effectiveWallpaperUrl
+    readonly property bool useWallpaperBackdrop: root.auroraEverywhere && !root.inirEverywhere && !Appearance.gameModeMinimal && root.wallpaperUrl.length > 0
     
     ColorQuantizer {
         id: wallpaperColorQuantizer
-        source: root.wallpaperUrl
+        source: (Appearance.auroraEverywhere || Appearance.angelEverywhere) ? root.wallpaperUrl : ""
         depth: 0
         rescaleSize: 10
     }
@@ -68,7 +69,7 @@ Item {
         
         clip: true
 
-        layer.enabled: root.auroraEverywhere && !root.inirEverywhere && !Appearance.gameModeMinimal
+        layer.enabled: root.useWallpaperBackdrop
         layer.effect: GE.OpacityMask {
             maskSource: Rectangle {
                 width: background.width
@@ -83,13 +84,15 @@ Item {
             anchors.centerIn: parent
             width: root.screenWidth
             height: root.screenHeight
-            visible: root.auroraEverywhere && !root.inirEverywhere && !Appearance.gameModeMinimal
-            source: root.wallpaperUrl
+            visible: root.useWallpaperBackdrop
+            source: root.useWallpaperBackdrop ? root.wallpaperUrl : ""
             fillMode: Image.PreserveAspectCrop
             cache: true
+            sourceSize.width: root.screenWidth
+            sourceSize.height: root.screenHeight
             asynchronous: true
 
-            layer.enabled: Appearance.effectsEnabled
+            layer.enabled: Appearance.effectsEnabled && root.auroraEverywhere && !root.inirEverywhere
             layer.effect: MultiEffect {
                 source: blurredWallpaper
                 anchors.fill: source
@@ -97,7 +100,7 @@ Item {
                     ? Appearance.angel.blurSaturation
                     : (Appearance.effectsEnabled ? 0.2 : 0)
                 blurEnabled: Appearance.effectsEnabled
-                blurMax: 100
+                blurMax: 64
                 blur: Appearance.effectsEnabled ? 1 : 0
             }
 

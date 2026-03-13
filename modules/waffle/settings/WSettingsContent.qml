@@ -288,7 +288,7 @@ Item {
             color: Looks.colors.bgPanelFooterBase
             
             Behavior on Layout.preferredWidth {
-                animation: Looks.transition.resize.createObject(this)
+                animation: NumberAnimation { duration: Looks.transition.enabled ? Looks.transition.duration.medium : 0; easing.type: Easing.BezierSpline; easing.bezierCurve: Looks.transition.easing.bezierCurve.standard }
             }
             
             ColumnLayout {
@@ -304,16 +304,57 @@ Item {
                     Layout.bottomMargin: 8
                     spacing: 10
                     visible: root.navExpanded
-                    
-                    WText {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 6
-                        text: Translation.tr("Settings")
-                        font.pixelSize: Looks.font.pixelSize.larger
-                        font.weight: Looks.font.weight.strong
-                        color: Looks.colors.fg
+
+                    Item {
+                        implicitWidth: 34
+                        implicitHeight: 34
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: Looks.colors.bg1
+                            border.width: 1
+                            border.color: Looks.colors.accent
+                        }
+
+                        WUserAvatar {
+                            anchors.centerIn: parent
+                            sourceSize: Qt.size(30, 30)
+                        }
                     }
-                    
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+
+                        WText {
+                            text: Translation.tr("Settings")
+                            font.pixelSize: Looks.font.pixelSize.larger
+                            font.weight: Looks.font.weight.strong
+                            color: Looks.colors.fg
+                        }
+
+                        WText {
+                            text: SystemInfo.displayName || SystemInfo.username
+                            font.pixelSize: Looks.font.pixelSize.small
+                            color: Looks.colors.subfg
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    WBorderlessButton {
+                        implicitWidth: 28
+                        implicitHeight: 28
+                        onClicked: Quickshell.execDetached(["/usr/bin/qs", "-c", "ii", "ipc", "call", "lock", "activate"])
+
+                        contentItem: FluentIcon {
+                            anchors.centerIn: parent
+                            icon: "lock-closed"
+                            implicitSize: 14
+                            color: Looks.colors.subfg
+                        }
+                    }
+
                     WBorderlessButton {
                         implicitWidth: 28
                         implicitHeight: 28
@@ -357,7 +398,7 @@ Item {
                     border.color: searchInput.activeFocus ? Looks.colors.accent : Looks.colors.bg2Border
                     
                       Behavior on border.color {
-                          animation: Looks.transition.color.createObject(this)
+                          animation: ColorAnimation { duration: Looks.transition.enabled ? 70 : 0; easing.type: Easing.BezierSpline; easing.bezierCurve: Looks.transition.easing.bezierCurve.standard }
                       }
                     
                     RowLayout {
@@ -391,6 +432,10 @@ Item {
                                 
                                 onTextChanged: {
                                     root.searchText = text;
+                                    if (text.length > 0 && !pageStack.preloadRequested) {
+                                        pageStack.preloadRequested = true
+                                        preloadTimer.start()
+                                    }
                                     root.recomputeSearchResults();
                                 }
                                 
@@ -518,7 +563,7 @@ Item {
                             }
                             
                               Behavior on color {
-                                  animation: Looks.transition.color.createObject(this)
+                                  animation: ColorAnimation { duration: Looks.transition.enabled ? 70 : 0; easing.type: Easing.BezierSpline; easing.bezierCurve: Looks.transition.easing.bezierCurve.standard }
                               }
                             
                             MouseArea {
@@ -590,7 +635,7 @@ Item {
                                     opacity: resultMouse.containsMouse || resultDelegate.ListView.isCurrentItem ? 1 : 0
                                     
                                       Behavior on opacity {
-                                          animation: Looks.transition.opacity.createObject(this)
+                                          animation: NumberAnimation { duration: Looks.transition.enabled ? Looks.transition.duration.normal : 0; easing.type: Easing.BezierSpline; easing.bezierCurve: Looks.transition.easing.bezierCurve.standard }
                                       }
                                 }
                             }
@@ -713,6 +758,7 @@ Item {
                 
                 property var visitedPages: ({})
                 property bool allPagesLoaded: false
+                property bool preloadRequested: false
                 
                 Connections {
                     target: root
@@ -724,8 +770,6 @@ Item {
                 
                 Component.onCompleted: {
                     visitedPages[root.currentPage] = true
-                    // Pre-load all pages async for search registration
-                    preloadTimer.start()
                 }
                 
                 // Timer to pre-load pages one by one
@@ -764,7 +808,7 @@ Item {
                         opacity: visible ? 1 : 0
                         
                           Behavior on opacity {
-                              animation: Looks.transition.opacity.createObject(this)
+                              animation: NumberAnimation { duration: Looks.transition.enabled ? Looks.transition.duration.normal : 0; easing.type: Easing.BezierSpline; easing.bezierCurve: Looks.transition.easing.bezierCurve.standard }
                           }
                     }
                 }
@@ -777,6 +821,10 @@ Item {
         sequences: [StandardKey.Find]
         onActivated: {
             if (!root.navExpanded) root.navExpanded = true;
+            if (!pageStack.preloadRequested) {
+                pageStack.preloadRequested = true
+                preloadTimer.start()
+            }
             searchInput.forceActiveFocus();
         }
     }

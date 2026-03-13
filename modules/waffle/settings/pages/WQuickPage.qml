@@ -1,4 +1,5 @@
 pragma ComponentBehavior: Bound
+import qs
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -25,6 +26,11 @@ WSettingsPage {
     // Target monitor for wallpaper operations
     property string targetMonitor: {
         if (!multiMonitorEnabled) return ""
+        const primary = GlobalStates.primaryScreen
+        const primaryName = primary ? (WallpaperListener.getMonitorName(primary) ?? "") : ""
+        if (primaryName) return primaryName
+        const focused = WallpaperListener.getFocusedMonitor()
+        if (focused) return focused
         const screens = Quickshell.screens
         if (!screens || screens.length === 0) return ""
         return WallpaperListener.getMonitorName(screens[0]) ?? ""
@@ -206,6 +212,7 @@ WSettingsPage {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     model: Wallpapers.folderModel
+                    Component.onCompleted: Wallpapers.generateThumbnail("large")
 
                     delegate: Item {
                         id: gridThumb
@@ -237,7 +244,7 @@ WSettingsPage {
                             clip: true
 
                             scale: gridMa.containsMouse ? 0.95 : 1.0
-                            Behavior on scale { animation: Looks.transition.hover.createObject(this) }
+                            Behavior on scale { animation: NumberAnimation { duration: Looks.transition.enabled ? Looks.transition.duration.normal : 0; easing.type: Easing.BezierSpline; easing.bezierCurve: Looks.transition.easing.bezierCurve.standard } }
 
                             // Folder
                             ColumnLayout {
@@ -257,6 +264,7 @@ WSettingsPage {
 
                             // Image thumb
                             Image {
+                                id: wpGridThumbImg
                                 visible: !gridThumb.fileIsDir && !WallpaperListener.isVideoPath(gridThumb.filePath)
                                 anchors.fill: parent
                                 anchors.margins: thumbRect.border.width
@@ -266,6 +274,19 @@ WSettingsPage {
                                 sourceSize.height: 110
                                 cache: true
                                 asynchronous: true
+                                onStatusChanged: {
+                                    if (status === Image.Error && gridThumb.filePath)
+                                        source = gridThumb.filePath.startsWith("file://") ? gridThumb.filePath : "file://" + gridThumb.filePath
+                                }
+                                Connections {
+                                    target: Wallpapers
+                                    function onThumbnailGenerated(directory) {
+                                        if (wpGridThumbImg.status !== Image.Ready && gridThumb.filePath) {
+                                            wpGridThumbImg.source = ""
+                                            wpGridThumbImg.source = gridThumb.thumbSource
+                                        }
+                                    }
+                                }
                             }
                             Image {
                                 visible: !gridThumb.fileIsDir && WallpaperListener.isVideoPath(gridThumb.filePath)
@@ -391,7 +412,7 @@ WSettingsPage {
                         border.width: 1
                         border.color: isSelected ? Looks.colors.accent : Looks.colors.bg2Border
 
-                        Behavior on color { animation: Looks.transition.color.createObject(this) }
+                        Behavior on color { animation: ColorAnimation { duration: Looks.transition.enabled ? 70 : 0; easing.type: Easing.BezierSpline; easing.bezierCurve: Looks.transition.easing.bezierCurve.standard } }
 
                         WText {
                             anchors.centerIn: parent

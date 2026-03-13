@@ -144,7 +144,25 @@
                 "starship": true,
                 "btop": true,
                 "lazygit": true,
-                "yazi": true
+                "yazi": true,
+                "omp": true
+            },
+            "enableOpenCode": true,
+            "vscodeEditors": {
+                "code": true,
+                "codium": true,
+                "codeOss": true,
+                "codeInsiders": true,
+                "cursor": true,
+                "windsurf": true,
+                "windsurfNext": true,
+                "qoder": true,
+                "antigravity": true,
+                "positron": true,
+                "voidEditor": true,
+                "melty": true,
+                "pearai": true,
+                "aide": true
             }
         },
         "typography": {
@@ -191,16 +209,18 @@
             "vignetteIntensity": 1,
             "vignetteRadius": 0.7,
             "wallpaperPath": "",
-            "hideWallpaper": false
+            "hideWallpaper": false,
+            "enableAnimation": false,
+            "thumbnailPath": "",
+            "useAuroraStyle": false,
+            "auroraOverlayOpacity": 0.38
         },
         "enableAnimation": true,
         "effects": {
             "blurRadius": 22,
-            "blurStatic": 0,
             "dim": 30,
             "dynamicDim": 20,
             "enableBlur": true,
-            "videoBlurStrength": 50,
             "ripple": {
                 "enable": false,
                 "charging": true,
@@ -213,7 +233,9 @@
                 "sparkleIntensity": 1.0,
                 "glowIntensity": 1.0,
                 "ringWidth": 0.15
-            }
+            },
+            "thumbnailBlurStrength": 50,
+            "enableAnimatedBlur": false
         },
         "hideWhenFullscreen": true,
         "parallax": {
@@ -233,7 +255,7 @@
             "folder": ""
         },
         "backend": {
-            "provider": "internal",
+            "provider": "awww",
             "awww": {
                 "transitionFps": 60,
                 "simpleStep": 5,
@@ -245,7 +267,12 @@
             "type": "crossfade",
             "direction": "right",
             "duration": 800,
-            "bezier": [0.54, 0.0, 0.34, 0.99]
+            "bezier": [
+                0.54,
+                0.0,
+                0.34,
+                0.99
+            ]
         },
         "widgets": {
             "clock": {
@@ -669,6 +696,7 @@
             "visualize": true
         },
         "keepRightSidebarLoaded": true,
+        "instantOpen": false,
         "layout": "default",
         "quickSliders": {
             "enable": true,
@@ -990,12 +1018,19 @@
         "background": {
             "wallpaperPath": "",
             "useMainWallpaper": true,
+            "transition": {
+                "enable": true,
+                "type": "crossfade",
+                "direction": "right",
+                "duration": 800
+            },
             "effects": {
                 "enableBlur": false,
                 "blurRadius": 32,
-                "blurStatic": 0,
                 "dim": 0,
-                "dynamicDim": 0
+                "dynamicDim": 0,
+                "enableAnimatedBlur": false,
+                "thumbnailBlurStrength": 70
             },
             "backdrop": {
                 "enable": true,
@@ -1004,11 +1039,14 @@
                 "wallpaperPath": "",
                 "blurRadius": 32,
                 "dim": 35,
-                "saturation": 1.0,
-                "contrast": 1.0,
+                "saturation": 0,
+                "contrast": 0,
                 "vignetteEnabled": false,
                 "vignetteIntensity": 0.5,
-                "vignetteRadius": 0.7
+                "vignetteRadius": 0.7,
+                "enableAnimation": false,
+                "enableAnimatedBlur": false,
+                "thumbnailPath": ""
             },
             "hideWhenFullscreen": true,
             "parallax": {

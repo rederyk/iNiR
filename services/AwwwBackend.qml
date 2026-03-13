@@ -12,18 +12,31 @@ import qs.services
 Singleton {
     id: root
 
-    readonly property string provider: Config.options?.background?.backend?.provider ?? "internal"
-    readonly property bool enabled: provider === "awww"
+    readonly property string provider: "awww"
+    readonly property bool enabled: true
     readonly property int transitionFps: Config.options?.background?.backend?.awww?.transitionFps ?? 60
     readonly property int simpleStep: Config.options?.background?.backend?.awww?.simpleStep ?? 5
     readonly property int spatialStep: Config.options?.background?.backend?.awww?.spatialStep ?? 30
-    readonly property int transitionDurationMs: Config.options?.background?.transition?.duration ?? 800
+    readonly property bool _usingWaffleOwnWallpaper: panelFamily === "waffle" && !waffleUsesMainWallpaper
+    readonly property var _waffleTransition: Config.options?.waffles?.background?.transition ?? {}
+    readonly property int transitionDurationMs: _usingWaffleOwnWallpaper
+        ? (_waffleTransition.duration ?? 800)
+        : (Config.options?.background?.transition?.duration ?? 800)
     readonly property var transitionBezier: Config.options?.background?.transition?.bezier ?? [0.54, 0.0, 0.34, 0.99]
-    readonly property bool transitionsEnabled: Config.options?.background?.transition?.enable ?? true
-    readonly property string transitionType: Config.options?.background?.transition?.type ?? "crossfade"
-    readonly property string transitionDirection: Config.options?.background?.transition?.direction ?? "right"
+    readonly property bool transitionsEnabled: _usingWaffleOwnWallpaper
+        ? (_waffleTransition.enable ?? true)
+        : (Config.options?.background?.transition?.enable ?? true)
+    readonly property string transitionType: _usingWaffleOwnWallpaper
+        ? (_waffleTransition.type ?? "crossfade")
+        : (Config.options?.background?.transition?.type ?? "crossfade")
+    readonly property string transitionDirection: _usingWaffleOwnWallpaper
+        ? (_waffleTransition.direction ?? "right")
+        : (Config.options?.background?.transition?.direction ?? "right")
     readonly property string fillMode: Config.options?.background?.fillMode ?? "fill"
     readonly property bool animationEnabled: Config.options?.background?.enableAnimation ?? true
+    readonly property string panelFamily: Config.options?.panelFamily ?? "ii"
+    readonly property bool waffleUsesMainWallpaper: Config.options?.waffles?.background?.useMainWallpaper ?? true
+    readonly property string waffleWallpaperPath: Config.options?.waffles?.background?.wallpaperPath ?? ""
     readonly property bool multiMonitorEnabled: WallpaperListener.multiMonitorEnabled
     readonly property var effectivePerMonitor: WallpaperListener.effectivePerMonitor
     readonly property string globalWallpaperPath: Config.options?.background?.wallpaperPath ?? ""
@@ -45,7 +58,7 @@ Singleton {
         if (WallpaperListener.isVideoPath(cleanPath))
             return false
         if (WallpaperListener.isGifPath(cleanPath))
-            return animationEnabled
+            return false
         return true
     }
 
@@ -80,10 +93,15 @@ Singleton {
         syncDebounce.restart()
     }
 
-    function _mappedTransitionType(): string {
-        if (!transitionsEnabled)
-            return "none"
-        switch (transitionType) {
+    function isAwwwNativeTransitionType(type): bool {
+        return ["none", "simple", "fade", "left", "right", "top", "bottom", "wipe", "wave", "grow", "center", "any", "outer", "random"].includes(String(type ?? ""))
+    }
+
+    function normalizedAwwwTransitionType(type, directionValue = transitionDirection): string {
+        const rawType = String(type ?? "crossfade")
+        if (isAwwwNativeTransitionType(rawType))
+            return rawType
+        switch (rawType) {
         case "crossfade":
         case "fadeThrough":
         case "blurFade":
@@ -94,17 +112,23 @@ Singleton {
             return "wipe"
         case "slide":
         case "push":
-            return ["left", "right", "top", "bottom"].includes(transitionDirection) ? transitionDirection : "simple"
+            return ["left", "right", "top", "bottom"].includes(directionValue) ? directionValue : "right"
         default:
             return "simple"
         }
+    }
+
+    function _mappedTransitionType(): string {
+        if (!transitionsEnabled)
+            return "none"
+        return normalizedAwwwTransitionType(transitionType, transitionDirection)
     }
 
     function _mappedTransitionStep(): int {
         if (!transitionsEnabled)
             return 255
         const mappedType = _mappedTransitionType()
-        return mappedType === "simple" || mappedType === "fade"
+        return mappedType === "simple" || mappedType === "fade" || mappedType === "none"
             ? Math.max(1, simpleStep)
             : Math.max(1, spatialStep)
     }
@@ -149,7 +173,10 @@ Singleton {
                 continue
 
             const monitorData = multiMonitorEnabled ? (effectivePerMonitor[monitorName] ?? null) : null
-            const rawPath = monitorData && monitorData.path ? monitorData.path : globalWallpaperPath
+            const usingWaffleCustomWallpaper = panelFamily === "waffle" && !waffleUsesMainWallpaper
+            const rawPath = usingWaffleCustomWallpaper
+                ? waffleWallpaperPath
+                : (monitorData && monitorData.path ? monitorData.path : globalWallpaperPath)
             const cleanPath = FileUtils.trimFileProtocol(String(rawPath ?? ""))
             if (!supportsMainWallpaper(cleanPath))
                 continue
@@ -212,6 +239,11 @@ Singleton {
         if (signature === lastSyncSignature && !lastError)
             return
 
+        // If applyProc is already running with this exact signature, don't
+        // kill the in-progress transition just to restart the same one.
+        if (applyProc.running && applyProc._pendingSignature === signature)
+            return
+
         const transitionName = _mappedTransitionType()
         const resizeMode = resizeModeForFillMode(fillMode)
         const fps = Math.max(1, transitionFps)
@@ -231,7 +263,7 @@ Singleton {
                 command += " --transition-duration " + duration
             if (transitionName === "fade")
                 command += " --transition-bezier '" + bezier + "'"
-            if (transitionName === "wipe")
+            if (transitionName === "wipe" || transitionName === "wave")
                 command += " --transition-angle " + angle
             command += " '" + escapedPath + "'"
             lines.push(command)
@@ -301,6 +333,9 @@ Singleton {
     onEnabledChanged: syncDebounce.restart()
     onAvailableChanged: syncDebounce.restart()
     onGlobalWallpaperPathChanged: syncDebounce.restart()
+    onPanelFamilyChanged: syncDebounce.restart()
+    onWaffleUsesMainWallpaperChanged: syncDebounce.restart()
+    onWaffleWallpaperPathChanged: syncDebounce.restart()
     onEffectivePerMonitorChanged: syncDebounce.restart()
     onMultiMonitorEnabledChanged: syncDebounce.restart()
     onTransitionTypeChanged: syncDebounce.restart()
