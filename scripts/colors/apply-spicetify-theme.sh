@@ -219,7 +219,7 @@ css_path = pathlib.Path(sys.argv[1])
 new_block = sys.argv[2] + ' */'
 content = css_path.read_text()
 pattern = re.compile(
-    r'/\* === iNiR CSS variable bridge.*?=== \*/',
+    r'/\* === iNiR CSS variable bridge.*?end iNiR CSS variable bridge === \*/',
     re.DOTALL
 )
 # Strip ALL existing bridge blocks (including duplicates from prior bad runs)
@@ -238,6 +238,10 @@ download_sleek_css() {
     log "Downloading base CSS from Sleek theme..."
     if curl -L --create-dirs -o "$css_file" "$SLEEK_CSS_URL" 2>/dev/null; then
       log "Downloaded base CSS"
+      # Fix hard-to-read right-side playback controls (queue, connect, volume).
+      # Sleek bases these on selected-row (which is a dark background in Matugen).
+      # Change it to use the subtext color instead so they are visible.
+      sed -i 's/rgba(var(--spice-rgb-selected-row),.7)/var(--spice-subtext)/g' "$css_file"
     else
       log "Warning: Failed to download base CSS"
     fi
