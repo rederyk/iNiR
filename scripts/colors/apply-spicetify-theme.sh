@@ -135,7 +135,7 @@ read_colors() {
 generate_color_ini() {
   local color_file="$1"
   
-  read_colors || return 1
+  # COLORS array is now populated by configure_spicetify before this is called
 
   cat > "$color_file" << EOF
 [${SCHEME_NAME}]
@@ -252,9 +252,17 @@ configure_spicetify() {
   local user_css="$theme_dir/user.css"
 
   mkdir -p "$theme_dir" 2>/dev/null || return 1
+  
+  # Read the palette first so COLORS array is populated for both steps
+  read_colors || return 1
+  
   download_sleek_css "$user_css"
-  generate_color_ini "$color_file" || return 1
+  # Write user.css bridge FIRST so that when color.ini lands (last) and
+  # triggers spicetify watch's file-change debounce, user.css is already
+  # fully updated. Reversed order caused watch to reload Spotify from
+  # color.ini before user.css was written — leaving bridge vars stale.
   regenerate_user_css_bridge "$user_css"
+  generate_color_ini "$color_file" || return 1
 
   spicetify config inject_css 1 replace_colors 1 >> "$LOG_FILE" 2>&1 || true
   spicetify config current_theme "$THEME_NAME" color_scheme "$SCHEME_NAME" >> "$LOG_FILE" 2>&1 || true
