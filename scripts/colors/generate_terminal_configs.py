@@ -15,7 +15,11 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from zed.theme_generator import generate_zed_config
-from vscode.theme_generator import generate_vscode_theme, generate_all_vscode_themes, VSCODE_FORKS
+from vscode.theme_generator import (
+    generate_vscode_theme,
+    generate_all_vscode_themes,
+    VSCODE_FORKS,
+)
 
 
 def parse_scss_colors(scss_path):
@@ -71,13 +75,13 @@ def generate_kitty_config(colors, output_path):
 # Do not edit manually - changes will be overwritten
 
 # The basic colors
-foreground              {colors.get("term7", "#A89984")}
+foreground              {colors.get("term15", "#EBDBB2")}
 background              {colors.get("term0", "#282828")}
 selection_foreground    {colors.get("term0", "#282828")}
-selection_background    {colors.get("term7", "#A89984")}
+selection_background    {colors.get("term15", "#EBDBB2")}
 
 # Cursor colors
-cursor                  {colors.get("term7", "#A89984")}
+cursor                  {colors.get("term15", "#EBDBB2")}
 cursor_text_color       {colors.get("term0", "#282828")}
 
 # URL underline color when hovering with mouse
@@ -156,7 +160,11 @@ color15 {colors.get("term15", "#EBDBB2")}
     import subprocess
 
     try:
-        subprocess.run(["pkill", "--signal", "SIGUSR1", "-x", "kitty"], capture_output=True, timeout=2)
+        subprocess.run(
+            ["pkill", "--signal", "SIGUSR1", "-x", "kitty"],
+            capture_output=True,
+            timeout=2,
+        )
         print("  → Live-reloaded Kitty config (SIGUSR1)")
     except Exception:
         pass
@@ -290,15 +298,15 @@ def generate_alacritty_config(colors, output_path):
 
 [colors.primary]
 background = '{colors.get("term0", "#282828")}'
-foreground = '{colors.get("term7", "#A89984")}'
+foreground = '{colors.get("term15", "#EBDBB2")}'
 
 [colors.cursor]
 text   = '{colors.get("term0", "#282828")}'
-cursor = '{colors.get("term7", "#A89984")}'
+cursor = '{colors.get("term15", "#EBDBB2")}'
 
 [colors.selection]
 text       = '{colors.get("term0", "#282828")}'
-background = '{colors.get("term7", "#A89984")}'
+background = '{colors.get("term15", "#EBDBB2")}'
 
 [colors.normal]
 black   = '{colors.get("term0", "#282828")}'
@@ -353,7 +361,7 @@ def generate_foot_config(colors, output_path):
 # Do not edit manually - changes will be overwritten
 
 [colors]
-foreground={colors.get("term7", "#A89984")[1:]}
+foreground={colors.get("term15", "#EBDBB2")[1:]}
 background={colors.get("term0", "#282828")[1:]}
 
 ## Normal/regular colors (color palette 0-7)
@@ -378,7 +386,7 @@ bright7={colors.get("term15", "#EBDBB2")[1:]}  # bright white
 
 ## Cursor and selection colors
 selection-foreground={colors.get("term0", "#282828")[1:]}
-selection-background={colors.get("term7", "#A89984")[1:]}
+selection-background={colors.get("term15", "#EBDBB2")[1:]}
 jump-labels={colors.get("term0", "#282828")[1:]} {colors.get("term3", "#D79921")[1:]}
 urls={colors.get("term4", "#458588")[1:]}
 """
@@ -399,20 +407,6 @@ urls={colors.get("term4", "#458588")[1:]}
     else:
         print(f"✓ Generated Foot config (already integrated)")
 
-    # Remove stale colors.ini include (legacy from old matugen terminal template,
-    # no longer updated — was overriding inir-colors.ini with stale colors)
-    foot_path = Path(foot_conf)
-    if foot_path.exists():
-        old_content = foot_path.read_text()
-        new_content = re.sub(
-            r"^include\s*=\s*~/.config/foot/colors\.ini\s*\n?",
-            "",
-            old_content,
-            flags=re.MULTILINE,
-        )
-        if new_content != old_content:
-            foot_path.write_text(new_content)
-
 
 def generate_wezterm_config(colors, output_path):
     """Generate WezTerm terminal color config and auto-integrate"""
@@ -420,15 +414,15 @@ def generate_wezterm_config(colors, output_path):
 -- Do not edit manually - changes will be overwritten
 
 return {{
-  foreground = '{colors.get("term7", "#A89984")}',
+  foreground = '{colors.get("term15", "#EBDBB2")}',
   background = '{colors.get("term0", "#282828")}',
 
-  cursor_bg = '{colors.get("term7", "#A89984")}',
+  cursor_bg = '{colors.get("term15", "#EBDBB2")}',
   cursor_fg = '{colors.get("term0", "#282828")}',
-  cursor_border = '{colors.get("term7", "#A89984")}',
+  cursor_border = '{colors.get("term15", "#EBDBB2")}',
 
   selection_fg = '{colors.get("term0", "#282828")}',
-  selection_bg = '{colors.get("term7", "#A89984")}',
+  selection_bg = '{colors.get("term15", "#EBDBB2")}',
 
   scrollbar_thumb = '{colors.get("term8", "#928374")}',
   split = '{colors.get("term8", "#928374")}',
@@ -514,12 +508,12 @@ def generate_ghostty_config(colors, output_path):
 # Do not edit manually - changes will be overwritten
 
 background = {colors.get("term0", "#282828")}
-foreground = {colors.get("term7", "#A89984")}
+foreground = {colors.get("term15", "#EBDBB2")}
 
-cursor-color = {colors.get("term7", "#A89984")}
+cursor-color = {colors.get("term15", "#EBDBB2")}
 cursor-text = {colors.get("term0", "#282828")}
 
-selection-background = {colors.get("term7", "#A89984")}
+selection-background = {colors.get("term15", "#EBDBB2")}
 selection-foreground = {colors.get("term0", "#282828")}
 
 # Black
@@ -576,7 +570,7 @@ Color={colors.get("term0", "#282828")[1:]}
 Color={colors.get("term0", "#282828")[1:]}
 
 [Foreground]
-Color={colors.get("term7", "#A89984")[1:]}
+Color={colors.get("term15", "#EBDBB2")[1:]}
 
 [ForegroundIntense]
 Color={colors.get("term15", "#EBDBB2")[1:]}
@@ -657,7 +651,7 @@ onTertiary = '{colors.get("onTertiary", "#1D2021")}'
 surface = '{colors.get("surface", "#1D2021")}'
 onSurface = '{colors.get("onSurface", "#EBDBB2")}'
 background = '{colors.get("term0", "#282828")}'
-foreground = '{colors.get("term7", "#A89984")}'
+foreground = '{colors.get("term15", "#EBDBB2")}'
 black = '{colors.get("term0", "#282828")}'
 red = '{colors.get("term1", "#CC241D")}'
 green = '{colors.get("term2", "#98971A")}'
@@ -865,17 +859,14 @@ def generate_omp_config(colors, output_path):
                         "foreground": on_surface_variant,
                         "background": surface_container_high,
                         "template": " {{ .FormattedMs }} ",
-                        "properties": {
-                            "style": "austin",
-                            "threshold": 500
-                        }
+                        "properties": {"style": "austin", "threshold": 500},
                     },
                     {
                         "type": "status",
                         "style": "plain",
                         "foreground": on_error_container,
                         "background": error_container,
-                        "template": " {{ if gt .Code 0 }}✗ {{ .Code }}{{ end }} "
+                        "template": " {{ if gt .Code 0 }}✗ {{ .Code }}{{ end }} ",
                     },
                     {
                         "type": "path",
@@ -883,10 +874,7 @@ def generate_omp_config(colors, output_path):
                         "foreground": on_surface,
                         "background": surface_container,
                         "template": " {{ .Path }} ",
-                        "properties": {
-                            "style": "full",
-                            "folder_separator_icon": "/"
-                        }
+                        "properties": {"style": "full", "folder_separator_icon": "/"},
                     },
                     {
                         "type": "git",
@@ -894,12 +882,9 @@ def generate_omp_config(colors, output_path):
                         "foreground": on_primary_container,
                         "background": primary_container,
                         "template": " {{ .HEAD }}{{ if .Working.Changed }} ●{{ end }}{{ if .Staging.Changed }} ✚{{ end }} ",
-                        "properties": {
-                            "branch_icon": "",
-                            "fetch_status": True
-                        }
-                    }
-                ]
+                        "properties": {"branch_icon": "", "fetch_status": True},
+                    },
+                ],
             },
             {
                 "type": "rprompt",
@@ -908,9 +893,9 @@ def generate_omp_config(colors, output_path):
                         "type": "time",
                         "style": "plain",
                         "foreground": on_surface_variant,
-                        "template": " {{ .CurrentDate | date \"15:04\" }} "
+                        "template": ' {{ .CurrentDate | date "15:04" }} ',
                     }
-                ]
+                ],
             },
             {
                 "type": "prompt",
@@ -921,11 +906,11 @@ def generate_omp_config(colors, output_path):
                         "type": "text",
                         "style": "plain",
                         "foreground": primary,
-                        "template": "❯ "
+                        "template": "❯ ",
                     }
-                ]
-            }
-        ]
+                ],
+            },
+        ],
     }
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -1298,18 +1283,18 @@ def main():
 
     home = os.path.expanduser("~")
     all_terminals = [
-            "kitty",
-            "alacritty",
-            "foot",
-            "wezterm",
-            "ghostty",
-            "konsole",
-            "starship",
-            "omp",
-            "btop",
-            "lazygit",
-            "yazi",
-        ]
+        "kitty",
+        "alacritty",
+        "foot",
+        "wezterm",
+        "ghostty",
+        "konsole",
+        "starship",
+        "omp",
+        "btop",
+        "lazygit",
+        "yazi",
+    ]
     if args.terminals is None:
         terminals = [] if (args.zed or args.vscode) else all_terminals
     else:
@@ -1347,9 +1332,13 @@ def main():
             with open(colors_json_path, "r") as f:
                 m3_colors = json.load(f)
                 omp_colors = {**colors, **m3_colors}
-                generate_omp_config(omp_colors, f"{home}/.config/oh-my-posh/ii-auto.json")
+                generate_omp_config(
+                    omp_colors, f"{home}/.config/oh-my-posh/ii-auto.json"
+                )
         except FileNotFoundError:
-            print(f"Warning: {colors_json_path} not found, oh-my-posh theme may be incomplete")
+            print(
+                f"Warning: {colors_json_path} not found, oh-my-posh theme may be incomplete"
+            )
             generate_omp_config(colors, f"{home}/.config/oh-my-posh/ii-auto.json")
 
     if "btop" in terminals:
@@ -1362,9 +1351,13 @@ def main():
                 m3_colors = json.load(f)
                 # Merge M3 tokens with terminal colors
                 btop_colors = {**colors, **m3_colors}
-                generate_btop_config(btop_colors, f"{home}/.config/btop/themes/ii-auto.theme")
+                generate_btop_config(
+                    btop_colors, f"{home}/.config/btop/themes/ii-auto.theme"
+                )
         except FileNotFoundError:
-            print(f"Warning: {colors_json_path} not found, btop theme may be incomplete")
+            print(
+                f"Warning: {colors_json_path} not found, btop theme may be incomplete"
+            )
             generate_btop_config(colors, f"{home}/.config/btop/themes/ii-auto.theme")
 
     if "lazygit" in terminals:
@@ -1386,7 +1379,11 @@ def main():
             "~/.local/state/quickshell/user/generated/colors.json"
         )
         # Parse enabled forks from --vscode-forks argument if provided
-        forks_to_generate = args.vscode_forks if hasattr(args, 'vscode_forks') and args.vscode_forks else None
+        forks_to_generate = (
+            args.vscode_forks
+            if hasattr(args, "vscode_forks") and args.vscode_forks
+            else None
+        )
         results = generate_all_vscode_themes(colors_json, args.scss, forks_to_generate)
         if not results:
             print("✗ No VSCode forks found or all disabled")

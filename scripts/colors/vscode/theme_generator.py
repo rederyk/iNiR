@@ -11,6 +11,79 @@ import sys
 from pathlib import Path
 
 
+# ── Color manipulation helpers ──────────────────────────────────────────
+
+def _hex_to_hsl(hex_color: str):
+    """Convert hex color to (h, s, l) where h in [0,360), s,l in [0,1]."""
+    hex_color = hex_color.lstrip("#")
+    r = int(hex_color[0:2], 16) / 255.0
+    g = int(hex_color[2:4], 16) / 255.0
+    b = int(hex_color[4:6], 16) / 255.0
+    max_c = max(r, g, b)
+    min_c = min(r, g, b)
+    l = (max_c + min_c) / 2.0
+    if max_c == min_c:
+        return (0.0, 0.0, l)
+    d = max_c - min_c
+    s = d / (2.0 - max_c - min_c) if l > 0.5 else d / (max_c + min_c)
+    if max_c == r:
+        h = (g - b) / d + (6 if g < b else 0)
+    elif max_c == g:
+        h = (b - r) / d + 2
+    else:
+        h = (r - g) / d + 4
+    return (h * 60.0, s, l)
+
+
+def _hsl_to_hex(h: float, s: float, l: float) -> str:
+    """Convert (h, s, l) back to hex color."""
+    s = max(0.0, min(1.0, s))
+    l = max(0.0, min(1.0, l))
+    h = h % 360.0
+    c = (1.0 - abs(2.0 * l - 1.0)) * s
+    x = c * (1.0 - abs((h / 60.0) % 2.0 - 1.0))
+    m = l - c / 2.0
+    if h < 60:
+        r, g, b = c, x, 0
+    elif h < 120:
+        r, g, b = x, c, 0
+    elif h < 180:
+        r, g, b = 0, c, x
+    elif h < 240:
+        r, g, b = 0, x, c
+    elif h < 300:
+        r, g, b = x, 0, c
+    else:
+        r, g, b = c, 0, x
+    return f"#{int((r+m)*255):02x}{int((g+m)*255):02x}{int((b+m)*255):02x}"
+
+
+def _saturate(hex_color: str, factor: float, min_saturation: float = 0.35) -> str:
+    """Boost saturation with an additive minimum floor for very muted inputs."""
+    h, s, l = _hex_to_hsl(hex_color)
+    if s < 0.01:  # achromatic — can't saturate
+        return hex_color
+    s = max(min_saturation, min(1.0, s * factor))
+    return _hsl_to_hex(h, s, l)
+
+
+def _blend_colors(base: str, accent: str, ratio: float) -> str:
+    """Blend base color with accent. ratio=0.4 means 60% base + 40% accent."""
+    base = base.lstrip("#")
+    accent = accent.lstrip("#")
+    r = int(int(base[0:2], 16) * (1 - ratio) + int(accent[0:2], 16) * ratio)
+    g = int(int(base[2:4], 16) * (1 - ratio) + int(accent[2:4], 16) * ratio)
+    b = int(int(base[4:6], 16) * (1 - ratio) + int(accent[4:6], 16) * ratio)
+    return f"#{min(255,r):02x}{min(255,g):02x}{min(255,b):02x}"
+
+
+def _adjust_lightness(hex_color: str, target_min: float = 0.55, target_max: float = 0.80) -> str:
+    """Clamp lightness into a readable range for dark editor backgrounds."""
+    h, s, l = _hex_to_hsl(hex_color)
+    l = max(target_min, min(target_max, l))
+    return _hsl_to_hex(h, s, l)
+
+
 def generate_vscode_colors(colors, scss_path):
     """Generate VSCode workbench.colorCustomizations from Material You colors."""
     
@@ -460,109 +533,174 @@ def generate_vscode_colors(colors, scss_path):
 
 
 def generate_vscode_syntax(colors, term_colors):
-    """Generate VSCode editor.tokenColorCustomizations for syntax highlighting."""
-    
+    """Generate VSCode editor.tokenColorCustomizations for syntax highlighting.
+
+    Uses ANSI terminal palette (term1-6) which always has distinct hues even
+    with very desaturated/greyscale wallpapers.  Each syntax color gets a
+    saturation boost and a configurable blend with the theme's primary color
+    so the result feels cohesive rather than random.
+    """
+
     primary = colors.get("primary", "#d4b796")
-    secondary = colors.get("secondary", "#ccc2b2")
-    tertiary = colors.get("tertiary", "#b8cbb8")
-    error = colors.get("error", "#ffb4ab")
     on_surface = colors.get("on_surface", "#e3dfd9")
     on_surface_variant = colors.get("on_surface_variant", "#c4bfb8")
-    
-    # Syntax highlighting rules (TextMate scopes)
+    error = colors.get("error", "#ffb4ab")
+
+    # ANSI palette: always has distinct hues regardless of wallpaper saturation
+    # term1=red  term2=green  term3=yellow  term4=blue  term5=magenta  term6=cyan
+    t = lambda n: term_colors.get(f"term{n}", "#888888")
+
+    # Mix a percentage of the primary color into each syntax color for cohesion
+    mix_ratio = 0.40
+
+    def syntax_color(term_idx: int) -> str:
+        """Saturate a terminal color and blend with primary."""
+        raw = t(term_idx)
+        boosted = _saturate(raw, 1.6, min_saturation=0.40)
+        blended = _blend_colors(boosted, primary, mix_ratio)
+        return _adjust_lightness(blended, target_min=0.55, target_max=0.82)
+
+    col_keyword  = syntax_color(5)  # magenta → keywords, operators
+    col_string   = syntax_color(2)  # green   → strings, literals
+    col_function = syntax_color(4)  # blue    → functions, methods
+    col_type     = syntax_color(6)  # cyan    → types, classes
+    col_constant = syntax_color(3)  # yellow  → numbers, constants
+    col_tag      = syntax_color(1)  # red     → tags, special
+    col_property = _blend_colors(syntax_color(4), syntax_color(6), 0.5)  # blue-cyan → properties
+    col_error    = _saturate(error, 1.4, min_saturation=0.50)
+
     syntax_rules = [
-        # Comments
-        {"scope": ["comment", "punctuation.definition.comment"], "settings": {"foreground": on_surface_variant + "cc", "fontStyle": "italic"}},
-        
-        # Keywords
-        {"scope": ["keyword", "storage.type", "storage.modifier"], "settings": {"foreground": secondary}},
-        {"scope": ["keyword.control"], "settings": {"foreground": secondary, "fontStyle": ""}},
-        {"scope": ["keyword.operator"], "settings": {"foreground": secondary}},
-        
-        # Constants
-        {"scope": ["constant", "constant.language", "constant.character"], "settings": {"foreground": tertiary}},
-        {"scope": ["constant.numeric"], "settings": {"foreground": tertiary}},
-        {"scope": ["constant.other.color"], "settings": {"foreground": tertiary}},
-        
-        # Strings
-        {"scope": ["string"], "settings": {"foreground": tertiary}},
-        {"scope": ["string.regexp"], "settings": {"foreground": tertiary}},
-        {"scope": ["punctuation.definition.string"], "settings": {"foreground": tertiary}},
-        
-        # Functions
-        {"scope": ["entity.name.function", "support.function"], "settings": {"foreground": primary}},
-        {"scope": ["meta.function-call"], "settings": {"foreground": primary}},
-        
-        # Classes & Types
-        {"scope": ["entity.name.type", "entity.name.class", "support.type", "support.class"], "settings": {"foreground": primary}},
-        {"scope": ["entity.other.inherited-class"], "settings": {"foreground": primary, "fontStyle": "italic"}},
-        
+        # Comments — muted, italic
+        {"scope": ["comment", "punctuation.definition.comment"], "settings": {"foreground": on_surface_variant + "aa", "fontStyle": "italic"}},
+        {"scope": ["comment.block.documentation", "comment.block.javadoc"], "settings": {"foreground": on_surface_variant + "cc", "fontStyle": "italic"}},
+
+        # Keywords & storage
+        {"scope": ["keyword", "storage.type", "storage.modifier"], "settings": {"foreground": col_keyword}},
+        {"scope": ["keyword.control", "keyword.control.flow"], "settings": {"foreground": col_keyword}},
+        {"scope": ["keyword.operator", "keyword.operator.assignment"], "settings": {"foreground": col_keyword}},
+        {"scope": ["keyword.other.unit"], "settings": {"foreground": col_constant}},
+
+        # Constants & numbers
+        {"scope": ["constant", "constant.language", "constant.character"], "settings": {"foreground": col_constant}},
+        {"scope": ["constant.numeric", "constant.numeric.integer", "constant.numeric.float"], "settings": {"foreground": col_constant}},
+        {"scope": ["constant.other.color", "constant.other.symbol"], "settings": {"foreground": col_constant}},
+
+        # Strings & literals
+        {"scope": ["string", "string.quoted"], "settings": {"foreground": col_string}},
+        {"scope": ["string.regexp"], "settings": {"foreground": col_tag}},
+        {"scope": ["string.template", "string.interpolated"], "settings": {"foreground": col_string}},
+        {"scope": ["string.other.link"], "settings": {"foreground": col_function}},
+        {"scope": ["punctuation.definition.string"], "settings": {"foreground": col_string}},
+        {"scope": ["constant.character.escape", "string.escape"], "settings": {"foreground": col_tag}},
+
+        # Functions & methods
+        {"scope": ["entity.name.function", "support.function"], "settings": {"foreground": col_function}},
+        {"scope": ["meta.function-call", "entity.name.function.call"], "settings": {"foreground": col_function}},
+        {"scope": ["support.function.builtin"], "settings": {"foreground": col_function}},
+        {"scope": ["entity.name.function.decorator", "meta.decorator"], "settings": {"foreground": col_tag, "fontStyle": "italic"}},
+
+        # Classes, types & interfaces
+        {"scope": ["entity.name.type", "entity.name.class", "support.type", "support.class"], "settings": {"foreground": col_type}},
+        {"scope": ["entity.other.inherited-class"], "settings": {"foreground": col_type, "fontStyle": "italic"}},
+        {"scope": ["entity.name.type.interface"], "settings": {"foreground": col_type}},
+        {"scope": ["entity.name.type.enum"], "settings": {"foreground": col_type}},
+        {"scope": ["support.type.builtin", "support.type.primitive"], "settings": {"foreground": col_type}},
+
         # Variables
         {"scope": ["variable", "variable.other"], "settings": {"foreground": on_surface}},
-        {"scope": ["variable.language"], "settings": {"foreground": error, "fontStyle": "italic"}},
-        {"scope": ["variable.parameter"], "settings": {"foreground": on_surface}},
-        
-        # Properties & Attributes
-        {"scope": ["variable.other.property", "support.variable.property"], "settings": {"foreground": secondary}},
-        {"scope": ["entity.other.attribute-name"], "settings": {"foreground": secondary}},
-        
-        # Tags (HTML/XML)
-        {"scope": ["entity.name.tag"], "settings": {"foreground": primary}},
-        {"scope": ["punctuation.definition.tag"], "settings": {"foreground": primary}},
-        
+        {"scope": ["variable.language"], "settings": {"foreground": col_tag, "fontStyle": "italic"}},
+        {"scope": ["variable.parameter", "variable.parameter.function"], "settings": {"foreground": on_surface}},
+
+        # Properties & attributes
+        {"scope": ["variable.other.property", "support.variable.property", "variable.other.object.property"], "settings": {"foreground": col_property}},
+        {"scope": ["entity.other.attribute-name"], "settings": {"foreground": col_property}},
+        {"scope": ["meta.object-literal.key"], "settings": {"foreground": col_property}},
+
+        # Tags (HTML/XML/JSX)
+        {"scope": ["entity.name.tag"], "settings": {"foreground": col_tag}},
+        {"scope": ["punctuation.definition.tag"], "settings": {"foreground": col_tag}},
+        {"scope": ["entity.name.tag.css"], "settings": {"foreground": col_type}},
+        {"scope": ["support.type.property-name.css"], "settings": {"foreground": col_property}},
+        {"scope": ["support.constant.property-value.css"], "settings": {"foreground": col_constant}},
+
         # Punctuation
         {"scope": ["punctuation"], "settings": {"foreground": on_surface}},
         {"scope": ["punctuation.separator", "punctuation.terminator"], "settings": {"foreground": on_surface_variant}},
-        
+        {"scope": ["punctuation.section.embedded"], "settings": {"foreground": col_tag}},
+
         # Markup (Markdown)
-        {"scope": ["markup.heading"], "settings": {"foreground": primary, "fontStyle": "bold"}},
+        {"scope": ["markup.heading"], "settings": {"foreground": col_function, "fontStyle": "bold"}},
         {"scope": ["markup.bold"], "settings": {"foreground": on_surface, "fontStyle": "bold"}},
         {"scope": ["markup.italic"], "settings": {"foreground": on_surface, "fontStyle": "italic"}},
-        {"scope": ["markup.underline.link"], "settings": {"foreground": primary, "fontStyle": "underline"}},
-        {"scope": ["markup.inline.raw"], "settings": {"foreground": tertiary}},
-        {"scope": ["markup.list"], "settings": {"foreground": secondary}},
-        
+        {"scope": ["markup.underline.link"], "settings": {"foreground": col_function, "fontStyle": "underline"}},
+        {"scope": ["markup.inline.raw", "markup.fenced_code"], "settings": {"foreground": col_string}},
+        {"scope": ["markup.list"], "settings": {"foreground": col_keyword}},
+        {"scope": ["markup.deleted"], "settings": {"foreground": col_error}},
+        {"scope": ["markup.inserted"], "settings": {"foreground": col_string}},
+        {"scope": ["markup.changed"], "settings": {"foreground": col_constant}},
+
         # Invalid
-        {"scope": ["invalid"], "settings": {"foreground": error}},
-        {"scope": ["invalid.deprecated"], "settings": {"foreground": error, "fontStyle": "italic"}},
+        {"scope": ["invalid"], "settings": {"foreground": col_error}},
+        {"scope": ["invalid.deprecated"], "settings": {"foreground": col_error, "fontStyle": "italic strikethrough"}},
     ]
-    
+
     return syntax_rules
 
 
-def generate_vscode_semantic_tokens(colors):
-    """Generate VSCode semantic token rules to keep syntax contrast strong."""
+def generate_vscode_semantic_tokens(colors, term_colors):
+    """Generate VSCode semantic token rules using ANSI terminal palette.
+
+    Mirrors the syntax highlighting approach: terminal palette colors with
+    saturation boost and primary blending for consistent readability.
+    """
 
     primary = colors.get("primary", "#d4b796")
-    secondary = colors.get("secondary", "#ccc2b2")
-    tertiary = colors.get("tertiary", "#b8cbb8")
-    error = colors.get("error", "#ffb4ab")
     on_surface = colors.get("on_surface", "#e3dfd9")
     on_surface_variant = colors.get("on_surface_variant", "#c4bfb8")
+    error = colors.get("error", "#ffb4ab")
+
+    t = lambda n: term_colors.get(f"term{n}", "#888888")
+    mix_ratio = 0.40
+
+    def sc(term_idx: int) -> str:
+        raw = t(term_idx)
+        boosted = _saturate(raw, 1.6, min_saturation=0.40)
+        blended = _blend_colors(boosted, primary, mix_ratio)
+        return _adjust_lightness(blended, target_min=0.55, target_max=0.82)
+
+    col_keyword  = sc(5)  # magenta
+    col_string   = sc(2)  # green
+    col_function = sc(4)  # blue
+    col_type     = sc(6)  # cyan
+    col_constant = sc(3)  # yellow
+    col_tag      = sc(1)  # red
+    col_property = _blend_colors(sc(4), sc(6), 0.5)
+    col_error    = _saturate(error, 1.4, min_saturation=0.50)
 
     return {
-        "class": primary,
-        "enum": secondary,
-        "enumMember": tertiary,
-        "function": primary,
-        "method": primary,
-        "interface": secondary,
-        "namespace": secondary,
+        "class": col_type,
+        "enum": col_type,
+        "enumMember": col_constant,
+        "function": col_function,
+        "method": col_function,
+        "interface": col_type,
+        "namespace": col_type,
         "parameter": on_surface,
-        "property": secondary,
-        "struct": secondary,
-        "type": secondary,
-        "typeParameter": tertiary,
+        "property": col_property,
+        "struct": col_type,
+        "type": col_type,
+        "typeParameter": col_constant,
         "variable": on_surface,
-        "variable.constant": tertiary,
-        "variable.defaultLibrary": error,
-        "comment": on_surface_variant + "cc",
-        "keyword": secondary,
-        "keyword.control": secondary,
-        "number": tertiary,
-        "string": tertiary,
-        "regexp": tertiary,
-        "operator": secondary,
+        "variable.constant": col_constant,
+        "variable.defaultLibrary": col_tag,
+        "comment": on_surface_variant + "aa",
+        "keyword": col_keyword,
+        "keyword.control": col_keyword,
+        "number": col_constant,
+        "string": col_string,
+        "regexp": col_tag,
+        "operator": col_keyword,
+        "decorator": col_tag,
     }
 
 
@@ -626,7 +764,7 @@ def generate_vscode_theme(colors_json_path, scss_path, settings_path):
     # Generate color customizations
     color_customizations = generate_vscode_colors(colors, scss_path)
     syntax_customizations = generate_vscode_syntax(colors, term_colors)
-    semantic_customizations = generate_vscode_semantic_tokens(colors)
+    semantic_customizations = generate_vscode_semantic_tokens(colors, term_colors)
 
     # Merge into settings.json
     success = merge_settings_json(
@@ -667,6 +805,68 @@ def get_settings_path(fork_name: str) -> Path:
     """Get the settings.json path for a VSCode fork."""
     config_dir = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
     return Path(config_dir) / fork_name / "User" / "settings.json"
+
+
+def strip_vscode_theme(settings_path: str) -> bool:
+    """Remove iNiR color customizations from a VSCode settings.json.
+
+    Called when the user disables VSCode theming from Settings UI.
+    Removes workbench.colorCustomizations, editor.tokenColorCustomizations,
+    and editor.semanticTokenColorCustomizations entirely.
+    """
+    settings_path = Path(settings_path)
+    if not settings_path.exists():
+        return True  # nothing to strip
+
+    try:
+        with open(settings_path, "r") as f:
+            settings = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return False
+
+    changed = False
+    for key in [
+        "workbench.colorCustomizations",
+        "editor.tokenColorCustomizations",
+        "editor.semanticTokenColorCustomizations",
+    ]:
+        if key in settings:
+            del settings[key]
+            changed = True
+
+    if changed:
+        try:
+            with open(settings_path, "w") as f:
+                json.dump(settings, f, indent=2, ensure_ascii=False)
+            print(f"✓ Stripped iNiR theme from {settings_path}")
+        except OSError as e:
+            print(f"✗ Failed to write {settings_path}: {e}", file=sys.stderr)
+            return False
+
+    return True
+
+
+def strip_all_vscode_themes(forks: list = None):
+    """Strip iNiR theme from multiple VSCode forks."""
+    if forks is None:
+        forks = [key for key, name in VSCODE_FORKS.items()
+                 if get_settings_path(name).parent.exists()]
+
+    results = {}
+    for fork_key in forks:
+        fork_name = VSCODE_FORKS.get(fork_key)
+        if not fork_name:
+            continue
+        settings_path = get_settings_path(fork_name)
+        if not settings_path.exists():
+            continue
+        success = strip_vscode_theme(str(settings_path))
+        results[fork_key] = success
+        if success:
+            print(f"  ✓ {fork_name}")
+        else:
+            print(f"  ✗ {fork_name}", file=sys.stderr)
+    return results
 
 
 def generate_all_vscode_themes(colors_json_path: str, scss_path: str, forks: list = None):
@@ -713,8 +913,16 @@ if __name__ == "__main__":
     parser.add_argument("--forks", type=str, nargs="*", default=None,
                         help=f"Forks to generate for. Options: {', '.join(VSCODE_FORKS.keys())}. Default: all installed")
     parser.add_argument("--list-forks", action="store_true", help="List all known forks and exit")
+    parser.add_argument("--strip", action="store_true",
+                        help="Remove iNiR color customizations from settings.json (used when disabling theming)")
     
     args = parser.parse_args()
+    
+    if args.strip:
+        results = strip_all_vscode_themes(args.forks)
+        stripped = sum(1 for v in results.values() if v)
+        print(f"Stripped themes from {stripped}/{len(results)} forks")
+        sys.exit(0)
     
     if args.list_forks:
         print("Known VSCode forks:")

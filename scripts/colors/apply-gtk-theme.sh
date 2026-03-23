@@ -48,6 +48,11 @@ SURFACE_DIM=$(jq -r '.surface_dim // empty' "$COLORS_JSON" 2>/dev/null)
 OUTLINE_VARIANT=$(jq -r '.outline_variant // empty' "$COLORS_JSON" 2>/dev/null)
 SURFACE_CONTAINER_HIGHEST=$(jq -r '.surface_container_highest // empty' "$COLORS_JSON" 2>/dev/null)
 
+# Semantic colors from Material tokens
+ERROR_COLOR=$(jq -r '.error // empty' "$COLORS_JSON" 2>/dev/null)
+TERTIARY=$(jq -r '.tertiary // empty' "$COLORS_JSON" 2>/dev/null)
+SECONDARY=$(jq -r '.secondary // empty' "$COLORS_JSON" 2>/dev/null)
+
 # If ThemePresets passes args (bg fg primary on_primary surface surface_dim), use them
 # This avoids the race condition between generateColorsJson() writing to disk and this script reading
 if [[ -n "${1:-}" ]]; then
@@ -86,6 +91,16 @@ adjust_color() {
 [[ -z "$SURFACE_CONTAINER_HIGH" ]]   && SURFACE_CONTAINER_HIGH=$(adjust_color "$BG" 23)
 [[ -z "$SURFACE_CONTAINER_HIGHEST" ]] && SURFACE_CONTAINER_HIGHEST=$(adjust_color "$BG" 34)
 [[ -z "$OUTLINE_VARIANT" ]]          && OUTLINE_VARIANT=$(adjust_color "$BG" 52)
+
+# Derive semantic color fallbacks from Material tokens
+[[ -z "$ERROR_COLOR" ]] && ERROR_COLOR="#ff6b6b"
+[[ -z "$TERTIARY" ]]    && TERTIARY="#ffa94d"
+[[ -z "$SECONDARY" ]]   && SECONDARY="#69db7c"
+
+# Map to KDE semantic names
+FG_NEGATIVE="$ERROR_COLOR"
+FG_NEUTRAL="$TERTIARY"
+FG_POSITIVE="$SECONDARY"
 
 avg_brightness() {
     local hex="${1#\#}"
@@ -168,10 +183,10 @@ DecorationHover=${PRIMARY}
 ForegroundActive=${FG}
 ForegroundInactive=${FG_INACTIVE}
 ForegroundLink=${PRIMARY}
-ForegroundNegative=#ff6b6b
-ForegroundNeutral=#ffa94d
+ForegroundNegative=${FG_NEGATIVE}
+ForegroundNeutral=${FG_NEUTRAL}
 ForegroundNormal=${FG}
-ForegroundPositive=#69db7c
+ForegroundPositive=${FG_POSITIVE}
 ForegroundVisited=${PRIMARY}
 
 [Colors:Selection]
@@ -196,10 +211,10 @@ DecorationHover=${PRIMARY}
 ForegroundActive=${FG}
 ForegroundInactive=${FG_INACTIVE}
 ForegroundLink=${PRIMARY}
-ForegroundNegative=#ff6b6b
-ForegroundNeutral=#ffa94d
+ForegroundNegative=${FG_NEGATIVE}
+ForegroundNeutral=${FG_NEUTRAL}
 ForegroundNormal=${FG}
-ForegroundPositive=#69db7c
+ForegroundPositive=${FG_POSITIVE}
 ForegroundVisited=${PRIMARY}
 
 [Colors:View]
@@ -210,10 +225,10 @@ DecorationHover=${PRIMARY}
 ForegroundActive=${FG}
 ForegroundInactive=${FG_INACTIVE}
 ForegroundLink=${PRIMARY}
-ForegroundNegative=#ff6b6b
-ForegroundNeutral=#ffa94d
+ForegroundNegative=${FG_NEGATIVE}
+ForegroundNeutral=${FG_NEUTRAL}
 ForegroundNormal=${FG}
-ForegroundPositive=#69db7c
+ForegroundPositive=${FG_POSITIVE}
 ForegroundVisited=${PRIMARY}
 
 [Colors:Window]
@@ -224,10 +239,10 @@ DecorationHover=${PRIMARY}
 ForegroundActive=${FG}
 ForegroundInactive=${FG_INACTIVE}
 ForegroundLink=${PRIMARY}
-ForegroundNegative=#ff6b6b
-ForegroundNeutral=#ffa94d
+ForegroundNegative=${FG_NEGATIVE}
+ForegroundNeutral=${FG_NEUTRAL}
 ForegroundNormal=${FG}
-ForegroundPositive=#69db7c
+ForegroundPositive=${FG_POSITIVE}
 ForegroundVisited=${PRIMARY}
 
 [Colors:Complementary]
@@ -238,10 +253,10 @@ DecorationHover=${PRIMARY}
 ForegroundActive=${FG}
 ForegroundInactive=${FG_INACTIVE}
 ForegroundLink=${PRIMARY}
-ForegroundNegative=#ff6b6b
-ForegroundNeutral=#ffa94d
+ForegroundNegative=${FG_NEGATIVE}
+ForegroundNeutral=${FG_NEUTRAL}
 ForegroundNormal=${FG}
-ForegroundPositive=#69db7c
+ForegroundPositive=${FG_POSITIVE}
 ForegroundVisited=${PRIMARY}
 
 [Colors:Header]
@@ -252,10 +267,10 @@ DecorationHover=${PRIMARY}
 ForegroundActive=${FG}
 ForegroundInactive=${FG_INACTIVE}
 ForegroundLink=${PRIMARY}
-ForegroundNegative=#ff6b6b
-ForegroundNeutral=#ffa94d
+ForegroundNegative=${FG_NEGATIVE}
+ForegroundNeutral=${FG_NEUTRAL}
 ForegroundNormal=${FG}
-ForegroundPositive=#69db7c
+ForegroundPositive=${FG_POSITIVE}
 ForegroundVisited=${PRIMARY}
 
 [Colors:Header][Inactive]
@@ -266,10 +281,10 @@ DecorationHover=${PRIMARY}
 ForegroundActive=${FG}
 ForegroundInactive=${FG_INACTIVE}
 ForegroundLink=${PRIMARY}
-ForegroundNegative=#ff6b6b
-ForegroundNeutral=#ffa94d
+ForegroundNegative=${FG_NEGATIVE}
+ForegroundNeutral=${FG_NEUTRAL}
 ForegroundNormal=${FG}
-ForegroundPositive=#69db7c
+ForegroundPositive=${FG_POSITIVE}
 ForegroundVisited=${PRIMARY}
 
 [Colors:Menu]
@@ -280,10 +295,10 @@ DecorationHover=${PRIMARY}
 ForegroundActive=${FG}
 ForegroundInactive=${FG_INACTIVE}
 ForegroundLink=${PRIMARY}
-ForegroundNegative=#ff6b6b
-ForegroundNeutral=#ffa94d
+ForegroundNegative=${FG_NEGATIVE}
+ForegroundNeutral=${FG_NEUTRAL}
 ForegroundNormal=${FG}
-ForegroundPositive=#69db7c
+ForegroundPositive=${FG_POSITIVE}
 ForegroundVisited=${PRIMARY}
 
 [General]
@@ -326,6 +341,9 @@ generate_darkly_colors() {
     local primary_rgb=$(hex_to_rgb "$PRIMARY")
     local on_primary_rgb=$(hex_to_rgb "$ON_PRIMARY")
     local surface_rgb=$(hex_to_rgb "$SURFACE")
+    local error_rgb=$(hex_to_rgb "$FG_NEGATIVE")
+    local neutral_rgb=$(hex_to_rgb "$FG_NEUTRAL")
+    local positive_rgb=$(hex_to_rgb "$FG_POSITIVE")
     
     cat << EOF
 [ColorEffects:Disabled]
@@ -356,10 +374,10 @@ DecorationHover=${primary_rgb}
 ForegroundActive=${fg_rgb}
 ForegroundInactive=${fg_inactive_rgb}
 ForegroundLink=${primary_rgb}
-ForegroundNegative=218,68,83
-ForegroundNeutral=246,116,0
+ForegroundNegative=${error_rgb}
+ForegroundNeutral=${neutral_rgb}
 ForegroundNormal=${fg_rgb}
-ForegroundPositive=36,173,89
+ForegroundPositive=${positive_rgb}
 ForegroundVisited=${primary_rgb}
 
 [Colors:Complementary]
@@ -370,10 +388,10 @@ DecorationHover=${primary_rgb}
 ForegroundActive=${fg_rgb}
 ForegroundInactive=${fg_inactive_rgb}
 ForegroundLink=${primary_rgb}
-ForegroundNegative=237,21,21
-ForegroundNeutral=201,206,59
+ForegroundNegative=${error_rgb}
+ForegroundNeutral=${neutral_rgb}
 ForegroundNormal=${fg_rgb}
-ForegroundPositive=17,209,22
+ForegroundPositive=${positive_rgb}
 ForegroundVisited=${primary_rgb}
 
 [Colors:Selection]
@@ -398,10 +416,10 @@ DecorationHover=${primary_rgb}
 ForegroundActive=${fg_rgb}
 ForegroundInactive=${fg_inactive_rgb}
 ForegroundLink=${primary_rgb}
-ForegroundNegative=218,68,83
-ForegroundNeutral=246,116,0
+ForegroundNegative=${error_rgb}
+ForegroundNeutral=${neutral_rgb}
 ForegroundNormal=${fg_rgb}
-ForegroundPositive=36,173,89
+ForegroundPositive=${positive_rgb}
 ForegroundVisited=${primary_rgb}
 
 [Colors:View]
@@ -412,10 +430,10 @@ DecorationHover=${primary_rgb}
 ForegroundActive=${fg_rgb}
 ForegroundInactive=${fg_inactive_rgb}
 ForegroundLink=${primary_rgb}
-ForegroundNegative=218,68,83
-ForegroundNeutral=246,116,0
+ForegroundNegative=${error_rgb}
+ForegroundNeutral=${neutral_rgb}
 ForegroundNormal=${fg_rgb}
-ForegroundPositive=36,173,89
+ForegroundPositive=${positive_rgb}
 ForegroundVisited=${primary_rgb}
 
 [Colors:Window]
@@ -426,10 +444,10 @@ DecorationHover=${primary_rgb}
 ForegroundActive=${fg_rgb}
 ForegroundInactive=${fg_inactive_rgb}
 ForegroundLink=${primary_rgb}
-ForegroundNegative=218,68,83
-ForegroundNeutral=246,116,0
+ForegroundNegative=${error_rgb}
+ForegroundNeutral=${neutral_rgb}
 ForegroundNormal=${fg_rgb}
-ForegroundPositive=36,173,89
+ForegroundPositive=${positive_rgb}
 ForegroundVisited=${primary_rgb}
 
 [General]

@@ -32,23 +32,36 @@ apply_code_editors() {
 
   if [[ "$enable_vscode" == 'true' ]]; then
     local enabled_forks=()
+    local disabled_forks=()
     if [[ -f "$CONFIG_FILE" ]] && command -v jq >/dev/null 2>&1; then
       local editors_config
       editors_config=$(jq -r '.appearance.wallpaperTheming.vscodeEditors // {}' "$CONFIG_FILE" 2>/dev/null || echo '{}')
-      [[ $(echo "$editors_config" | jq -r '.code // true') == 'true' ]] && [[ -d "$HOME/.config/Code" ]] && enabled_forks+=('code')
-      [[ $(echo "$editors_config" | jq -r '.codium // true') == 'true' ]] && [[ -d "$HOME/.config/VSCodium" ]] && enabled_forks+=('codium')
-      [[ $(echo "$editors_config" | jq -r '.codeOss // true') == 'true' ]] && [[ -d "$HOME/.config/Code - OSS" ]] && enabled_forks+=('code-oss')
-      [[ $(echo "$editors_config" | jq -r '.codeInsiders // true') == 'true' ]] && [[ -d "$HOME/.config/Code - Insiders" ]] && enabled_forks+=('code-insiders')
-      [[ $(echo "$editors_config" | jq -r '.cursor // true') == 'true' ]] && [[ -d "$HOME/.config/Cursor" ]] && enabled_forks+=('cursor')
-      [[ $(echo "$editors_config" | jq -r '.windsurf // true') == 'true' ]] && [[ -d "$HOME/.config/Windsurf" ]] && enabled_forks+=('windsurf')
-      [[ $(echo "$editors_config" | jq -r '.windsurfNext // true') == 'true' ]] && [[ -d "$HOME/.config/Windsurf - Next" ]] && enabled_forks+=('windsurf-next')
-      [[ $(echo "$editors_config" | jq -r '.qoder // true') == 'true' ]] && [[ -d "$HOME/.config/Qoder" ]] && enabled_forks+=('qoder')
-      [[ $(echo "$editors_config" | jq -r '.antigravity // true') == 'true' ]] && [[ -d "$HOME/.config/Antigravity" ]] && enabled_forks+=('antigravity')
-      [[ $(echo "$editors_config" | jq -r '.positron // true') == 'true' ]] && [[ -d "$HOME/.config/Positron" ]] && enabled_forks+=('positron')
-      [[ $(echo "$editors_config" | jq -r '.voidEditor // true') == 'true' ]] && [[ -d "$HOME/.config/Void" ]] && enabled_forks+=('void')
-      [[ $(echo "$editors_config" | jq -r '.melty // true') == 'true' ]] && [[ -d "$HOME/.config/Melty" ]] && enabled_forks+=('melty')
-      [[ $(echo "$editors_config" | jq -r '.pearai // true') == 'true' ]] && [[ -d "$HOME/.config/PearAI" ]] && enabled_forks+=('pearai')
-      [[ $(echo "$editors_config" | jq -r '.aide // true') == 'true' ]] && [[ -d "$HOME/.config/Aide" ]] && enabled_forks+=('aide')
+
+      _check_vscode_fork() {
+        local jq_key="$1" fork_key="$2" config_dir="$3"
+        if [[ $(echo "$editors_config" | jq -r ".$jq_key // true") == 'true' ]] && [[ -d "$config_dir" ]]; then
+          enabled_forks+=("$fork_key")
+        elif [[ -d "$config_dir" ]]; then
+          disabled_forks+=("$fork_key")
+        fi
+      }
+
+      _check_vscode_fork code code "$HOME/.config/Code"
+      _check_vscode_fork codium codium "$HOME/.config/VSCodium"
+      _check_vscode_fork codeOss code-oss "$HOME/.config/Code - OSS"
+      _check_vscode_fork codeInsiders code-insiders "$HOME/.config/Code - Insiders"
+      _check_vscode_fork cursor cursor "$HOME/.config/Cursor"
+      _check_vscode_fork windsurf windsurf "$HOME/.config/Windsurf"
+      _check_vscode_fork windsurfNext windsurf-next "$HOME/.config/Windsurf - Next"
+      _check_vscode_fork qoder qoder "$HOME/.config/Qoder"
+      _check_vscode_fork antigravity antigravity "$HOME/.config/Antigravity"
+      _check_vscode_fork positron positron "$HOME/.config/Positron"
+      _check_vscode_fork voidEditor void "$HOME/.config/Void"
+      _check_vscode_fork melty melty "$HOME/.config/Melty"
+      _check_vscode_fork pearai pearai "$HOME/.config/PearAI"
+      _check_vscode_fork aide aide "$HOME/.config/Aide"
+
+      unset -f _check_vscode_fork
     fi
 
     if [[ ${#enabled_forks[@]} -gt 0 ]]; then
@@ -61,6 +74,26 @@ apply_code_editors() {
       else
         "$python_cmd" "$SCRIPT_DIR/generate_terminal_configs.py" --scss "$SCSS_FILE" --vscode --vscode-forks "${enabled_forks[@]}" >> "$STATE_DIR/user/generated/code_editor_themes.log" 2>&1 || true
       fi
+    fi
+
+    # Strip theme from individually disabled forks
+    if [[ ${#disabled_forks[@]} -gt 0 ]]; then
+      if ensure_vscode_themegen; then
+        local strip_cmd=("$VSCODE_THEMEGEN_BIN" "--strip")
+        for fork in "${disabled_forks[@]}"; do
+          strip_cmd+=("--forks" "$fork")
+        done
+        "${strip_cmd[@]}" >> "$STATE_DIR/user/generated/code_editor_themes.log" 2>&1 || true
+      else
+        "$python_cmd" "$SCRIPT_DIR/vscode/theme_generator.py" --strip --forks "${disabled_forks[@]}" >> "$STATE_DIR/user/generated/code_editor_themes.log" 2>&1 || true
+      fi
+    fi
+  else
+    # VSCode theming globally disabled — strip all installed forks
+    if ensure_vscode_themegen; then
+      "$VSCODE_THEMEGEN_BIN" --strip >> "$STATE_DIR/user/generated/code_editor_themes.log" 2>&1 || true
+    else
+      "$python_cmd" "$SCRIPT_DIR/vscode/theme_generator.py" --strip >> "$STATE_DIR/user/generated/code_editor_themes.log" 2>&1 || true
     fi
   fi
 

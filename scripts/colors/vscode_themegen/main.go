@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,6 +41,128 @@ func (s *stringSlice) Set(value string) error {
 	return nil
 }
 
+// ── Color manipulation helpers ──────────────────────────────────────────
+
+type hsl struct{ h, s, l float64 }
+
+func hexToHSL(hex string) hsl {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) < 6 {
+		return hsl{}
+	}
+	r := float64(hexByte(hex[0:2])) / 255.0
+	g := float64(hexByte(hex[2:4])) / 255.0
+	b := float64(hexByte(hex[4:6])) / 255.0
+	maxC := math.Max(r, math.Max(g, b))
+	minC := math.Min(r, math.Min(g, b))
+	l := (maxC + minC) / 2.0
+	if maxC == minC {
+		return hsl{0, 0, l}
+	}
+	d := maxC - minC
+	var s float64
+	if l > 0.5 {
+		s = d / (2.0 - maxC - minC)
+	} else {
+		s = d / (maxC + minC)
+	}
+	var h float64
+	switch maxC {
+	case r:
+		h = (g - b) / d
+		if g < b {
+			h += 6
+		}
+	case g:
+		h = (b-r)/d + 2
+	default:
+		h = (r-g)/d + 4
+	}
+	return hsl{h * 60.0, s, l}
+}
+
+func hslToHex(c hsl) string {
+	s := math.Max(0, math.Min(1, c.s))
+	l := math.Max(0, math.Min(1, c.l))
+	h := math.Mod(c.h, 360)
+	if h < 0 {
+		h += 360
+	}
+	ch := (1.0 - math.Abs(2.0*l-1.0)) * s
+	x := ch * (1.0 - math.Abs(math.Mod(h/60.0, 2.0)-1.0))
+	m := l - ch/2.0
+	var r, g, b float64
+	switch {
+	case h < 60:
+		r, g, b = ch, x, 0
+	case h < 120:
+		r, g, b = x, ch, 0
+	case h < 180:
+		r, g, b = 0, ch, x
+	case h < 240:
+		r, g, b = 0, x, ch
+	case h < 300:
+		r, g, b = x, 0, ch
+	default:
+		r, g, b = ch, 0, x
+	}
+	return fmt.Sprintf("#%02x%02x%02x", clamp255(r+m), clamp255(g+m), clamp255(b+m))
+}
+
+func saturateColor(hex string, factor, minSat float64) string {
+	c := hexToHSL(hex)
+	if c.s < 0.01 {
+		return hex
+	}
+	c.s = math.Max(minSat, math.Min(1.0, c.s*factor))
+	return hslToHex(c)
+}
+
+func blendColors(base, accent string, ratio float64) string {
+	base = strings.TrimPrefix(base, "#")
+	accent = strings.TrimPrefix(accent, "#")
+	if len(base) < 6 || len(accent) < 6 {
+		return "#" + base
+	}
+	r := int(float64(hexByte(base[0:2]))*(1-ratio) + float64(hexByte(accent[0:2]))*ratio)
+	g := int(float64(hexByte(base[2:4]))*(1-ratio) + float64(hexByte(accent[2:4]))*ratio)
+	b := int(float64(hexByte(base[4:6]))*(1-ratio) + float64(hexByte(accent[4:6]))*ratio)
+	return fmt.Sprintf("#%02x%02x%02x", clampInt(r, 0, 255), clampInt(g, 0, 255), clampInt(b, 0, 255))
+}
+
+func adjustLightness(hex string, minL, maxL float64) string {
+	c := hexToHSL(hex)
+	c.l = math.Max(minL, math.Min(maxL, c.l))
+	return hslToHex(c)
+}
+
+func syntaxColor(termColors map[string]string, primary string, termIdx int) string {
+	raw := pick(termColors, fmt.Sprintf("term%d", termIdx), "#888888")
+	boosted := saturateColor(raw, 2.1, 0.50)
+	blended := blendColors(boosted, primary, 0.28)
+	return adjustLightness(blended, 0.50, 0.88)
+}
+
+func hexByte(s string) int {
+	var v int
+	fmt.Sscanf(s, "%x", &v)
+	return v
+}
+
+func clamp255(v float64) int {
+	return clampInt(int(v*255), 0, 255)
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
 func main() {
 	home, _ := os.UserHomeDir()
 	defaultColors := filepath.Join(home, ".local/state/quickshell/user/generated/colors.json")
@@ -48,9 +171,24 @@ func main() {
 	scssPath := flag.String("scss", defaultSCSS, "")
 	output := flag.String("output", "", "")
 	listForks := flag.Bool("list-forks", false, "")
+	stripMode := flag.Bool("strip", false, "Remove iNiR color customizations from settings.json")
 	var forks stringSlice
 	flag.Var(&forks, "forks", "")
 	flag.Parse()
+	if *stripMode {
+		results := stripAllThemes(forks)
+		success := 0
+		for _, ok := range results {
+			if ok {
+				success++
+			}
+		}
+		fmt.Printf("Stripped themes from %d/%d forks\n", success, len(results))
+		if success > 0 {
+			os.Exit(0)
+		}
+		os.Exit(1)
+	}
 	if *listForks {
 		fmt.Println("Known VSCode forks:")
 		for key, name := range vscodeForks {
@@ -139,8 +277,8 @@ func generateTheme(colorsPath, scssPath, settingsPath string) (bool, error) {
 		return false, err
 	}
 	settings["workbench.colorCustomizations"] = generateColors(colors, termColors)
-	settings["editor.tokenColorCustomizations"] = map[string]any{"textMateRules": generateSyntax(colors)}
-	settings["editor.semanticTokenColorCustomizations"] = map[string]any{"enabled": true, "rules": generateSemantic(colors)}
+	settings["editor.tokenColorCustomizations"] = map[string]any{"textMateRules": generateSyntax(colors, termColors)}
+	settings["editor.semanticTokenColorCustomizations"] = map[string]any{"enabled": true, "rules": generateSemantic(colors, termColors)}
 	if err := writeSettings(settingsPath, settings); err != nil {
 		return false, err
 	}
@@ -211,56 +349,169 @@ func generateColors(colors, termColors map[string]string) map[string]string {
 	}
 }
 
-func generateSyntax(colors map[string]string) []tokenRule {
+func generateSyntax(colors, termColors map[string]string) []tokenRule {
 	primary := pick(colors, "primary", "#d4b796")
-	secondary := pick(colors, "secondary", "#ccc2b2")
-	tertiary := pick(colors, "tertiary", "#b8cbb8")
-	errorCol := pick(colors, "error", "#ffb4ab")
 	onSurface := pick(colors, "on_surface", "#e3dfd9")
 	onSurfaceVariant := pick(colors, "on_surface_variant", "#c4bfb8")
+	errorCol := saturateColor(pick(colors, "error", "#ffb4ab"), 1.4, 0.50)
+
+	// ANSI palette: always has distinct hues regardless of wallpaper saturation
+	colKeyword := syntaxColor(termColors, primary, 5)  // magenta
+	colString := syntaxColor(termColors, primary, 2)   // green
+	colFunction := syntaxColor(termColors, primary, 4) // blue
+	colType := syntaxColor(termColors, primary, 6)     // cyan
+	colConstant := syntaxColor(termColors, primary, 3) // yellow
+	colTag := syntaxColor(termColors, primary, 1)      // red
+	colProperty := blendColors(syntaxColor(termColors, primary, 4), syntaxColor(termColors, primary, 6), 0.5)
+
 	return []tokenRule{
-		{[]string{"comment", "punctuation.definition.comment"}, map[string]string{"foreground": onSurfaceVariant + "cc", "fontStyle": "italic"}},
-		{[]string{"keyword", "storage.type", "storage.modifier"}, map[string]string{"foreground": secondary}},
-		{[]string{"keyword.control"}, map[string]string{"foreground": secondary, "fontStyle": ""}},
-		{[]string{"keyword.operator"}, map[string]string{"foreground": secondary}},
-		{[]string{"constant", "constant.language", "constant.character"}, map[string]string{"foreground": tertiary}},
-		{[]string{"constant.numeric"}, map[string]string{"foreground": tertiary}},
-		{[]string{"constant.other.color"}, map[string]string{"foreground": tertiary}},
-		{[]string{"string"}, map[string]string{"foreground": tertiary}},
-		{[]string{"string.regexp"}, map[string]string{"foreground": tertiary}},
-		{[]string{"punctuation.definition.string"}, map[string]string{"foreground": tertiary}},
-		{[]string{"entity.name.function", "support.function"}, map[string]string{"foreground": primary}},
-		{[]string{"meta.function-call"}, map[string]string{"foreground": primary}},
-		{[]string{"entity.name.type", "entity.name.class", "support.type", "support.class"}, map[string]string{"foreground": primary}},
-		{[]string{"entity.other.inherited-class"}, map[string]string{"foreground": primary, "fontStyle": "italic"}},
+		// Comments — muted, italic
+		{[]string{"comment", "punctuation.definition.comment"}, map[string]string{"foreground": onSurfaceVariant + "aa", "fontStyle": "italic"}},
+		{[]string{"comment.block.documentation", "comment.block.javadoc"}, map[string]string{"foreground": onSurfaceVariant + "cc", "fontStyle": "italic"}},
+		// Keywords & storage
+		{[]string{"keyword", "storage.type", "storage.modifier"}, map[string]string{"foreground": colKeyword}},
+		{[]string{"keyword.control", "keyword.control.flow"}, map[string]string{"foreground": colKeyword}},
+		{[]string{"keyword.operator", "keyword.operator.assignment"}, map[string]string{"foreground": colKeyword}},
+		{[]string{"keyword.other.unit"}, map[string]string{"foreground": colConstant}},
+		// Constants & numbers
+		{[]string{"constant", "constant.language", "constant.character"}, map[string]string{"foreground": colConstant}},
+		{[]string{"constant.numeric", "constant.numeric.integer", "constant.numeric.float"}, map[string]string{"foreground": colConstant}},
+		{[]string{"constant.other.color", "constant.other.symbol"}, map[string]string{"foreground": colConstant}},
+		// Strings & literals
+		{[]string{"string", "string.quoted"}, map[string]string{"foreground": colString}},
+		{[]string{"string.regexp"}, map[string]string{"foreground": colTag}},
+		{[]string{"string.template", "string.interpolated"}, map[string]string{"foreground": colString}},
+		{[]string{"string.other.link"}, map[string]string{"foreground": colFunction}},
+		{[]string{"punctuation.definition.string"}, map[string]string{"foreground": colString}},
+		{[]string{"constant.character.escape", "string.escape"}, map[string]string{"foreground": colTag}},
+		// Functions & methods
+		{[]string{"entity.name.function", "support.function"}, map[string]string{"foreground": colFunction}},
+		{[]string{"meta.function-call", "entity.name.function.call"}, map[string]string{"foreground": colFunction}},
+		{[]string{"support.function.builtin"}, map[string]string{"foreground": colFunction}},
+		{[]string{"entity.name.function.decorator", "meta.decorator"}, map[string]string{"foreground": colTag, "fontStyle": "italic"}},
+		// Classes, types & interfaces
+		{[]string{"entity.name.type", "entity.name.class", "support.type", "support.class"}, map[string]string{"foreground": colType}},
+		{[]string{"entity.other.inherited-class"}, map[string]string{"foreground": colType, "fontStyle": "italic"}},
+		{[]string{"entity.name.type.interface"}, map[string]string{"foreground": colType}},
+		{[]string{"entity.name.type.enum"}, map[string]string{"foreground": colType}},
+		{[]string{"support.type.builtin", "support.type.primitive"}, map[string]string{"foreground": colType}},
+		// Variables
 		{[]string{"variable", "variable.other"}, map[string]string{"foreground": onSurface}},
-		{[]string{"variable.language"}, map[string]string{"foreground": errorCol, "fontStyle": "italic"}},
-		{[]string{"variable.parameter"}, map[string]string{"foreground": onSurface}},
-		{[]string{"variable.other.property", "support.variable.property"}, map[string]string{"foreground": secondary}},
-		{[]string{"entity.other.attribute-name"}, map[string]string{"foreground": secondary}},
-		{[]string{"entity.name.tag"}, map[string]string{"foreground": primary}},
-		{[]string{"punctuation.definition.tag"}, map[string]string{"foreground": primary}},
+		{[]string{"variable.language"}, map[string]string{"foreground": colTag, "fontStyle": "italic"}},
+		{[]string{"variable.parameter", "variable.parameter.function"}, map[string]string{"foreground": onSurface}},
+		// Properties & attributes
+		{[]string{"variable.other.property", "support.variable.property", "variable.other.object.property"}, map[string]string{"foreground": colProperty}},
+		{[]string{"entity.other.attribute-name"}, map[string]string{"foreground": colProperty}},
+		{[]string{"meta.object-literal.key"}, map[string]string{"foreground": colProperty}},
+		// Tags (HTML/XML/JSX)
+		{[]string{"entity.name.tag"}, map[string]string{"foreground": colTag}},
+		{[]string{"punctuation.definition.tag"}, map[string]string{"foreground": colTag}},
+		{[]string{"entity.name.tag.css"}, map[string]string{"foreground": colType}},
+		{[]string{"support.type.property-name.css"}, map[string]string{"foreground": colProperty}},
+		{[]string{"support.constant.property-value.css"}, map[string]string{"foreground": colConstant}},
+		// Punctuation
 		{[]string{"punctuation"}, map[string]string{"foreground": onSurface}},
 		{[]string{"punctuation.separator", "punctuation.terminator"}, map[string]string{"foreground": onSurfaceVariant}},
-		{[]string{"markup.heading"}, map[string]string{"foreground": primary, "fontStyle": "bold"}},
+		{[]string{"punctuation.section.embedded"}, map[string]string{"foreground": colTag}},
+		// Markup (Markdown)
+		{[]string{"markup.heading"}, map[string]string{"foreground": colFunction, "fontStyle": "bold"}},
 		{[]string{"markup.bold"}, map[string]string{"foreground": onSurface, "fontStyle": "bold"}},
 		{[]string{"markup.italic"}, map[string]string{"foreground": onSurface, "fontStyle": "italic"}},
-		{[]string{"markup.underline.link"}, map[string]string{"foreground": primary, "fontStyle": "underline"}},
-		{[]string{"markup.inline.raw"}, map[string]string{"foreground": tertiary}},
-		{[]string{"markup.list"}, map[string]string{"foreground": secondary}},
+		{[]string{"markup.underline.link"}, map[string]string{"foreground": colFunction, "fontStyle": "underline"}},
+		{[]string{"markup.inline.raw", "markup.fenced_code"}, map[string]string{"foreground": colString}},
+		{[]string{"markup.list"}, map[string]string{"foreground": colKeyword}},
+		{[]string{"markup.deleted"}, map[string]string{"foreground": errorCol}},
+		{[]string{"markup.inserted"}, map[string]string{"foreground": colString}},
+		{[]string{"markup.changed"}, map[string]string{"foreground": colConstant}},
+		// Invalid
 		{[]string{"invalid"}, map[string]string{"foreground": errorCol}},
-		{[]string{"invalid.deprecated"}, map[string]string{"foreground": errorCol, "fontStyle": "italic"}},
+		{[]string{"invalid.deprecated"}, map[string]string{"foreground": errorCol, "fontStyle": "italic strikethrough"}},
 	}
 }
 
-func generateSemantic(colors map[string]string) map[string]string {
+func generateSemantic(colors, termColors map[string]string) map[string]string {
 	primary := pick(colors, "primary", "#d4b796")
-	secondary := pick(colors, "secondary", "#ccc2b2")
-	tertiary := pick(colors, "tertiary", "#b8cbb8")
-	errorCol := pick(colors, "error", "#ffb4ab")
 	onSurface := pick(colors, "on_surface", "#e3dfd9")
 	onSurfaceVariant := pick(colors, "on_surface_variant", "#c4bfb8")
-	return map[string]string{"class": primary, "enum": secondary, "enumMember": tertiary, "function": primary, "method": primary, "interface": secondary, "namespace": secondary, "parameter": onSurface, "property": secondary, "struct": secondary, "type": secondary, "typeParameter": tertiary, "variable": onSurface, "variable.constant": tertiary, "variable.defaultLibrary": errorCol, "comment": onSurfaceVariant + "cc", "keyword": secondary, "keyword.control": secondary, "number": tertiary, "string": tertiary, "regexp": tertiary, "operator": secondary}
+
+	colKeyword := syntaxColor(termColors, primary, 5)
+	colString := syntaxColor(termColors, primary, 2)
+	colFunction := syntaxColor(termColors, primary, 4)
+	colType := syntaxColor(termColors, primary, 6)
+	colConstant := syntaxColor(termColors, primary, 3)
+	colTag := syntaxColor(termColors, primary, 1)
+	colProperty := blendColors(syntaxColor(termColors, primary, 4), syntaxColor(termColors, primary, 6), 0.5)
+
+	return map[string]string{
+		"class": colType, "enum": colType, "enumMember": colConstant,
+		"function": colFunction, "method": colFunction,
+		"interface": colType, "namespace": colType,
+		"parameter": onSurface, "property": colProperty,
+		"struct": colType, "type": colType, "typeParameter": colConstant,
+		"variable": onSurface, "variable.constant": colConstant, "variable.defaultLibrary": colTag,
+		"comment": onSurfaceVariant + "aa",
+		"keyword": colKeyword, "keyword.control": colKeyword,
+		"number": colConstant, "string": colString, "regexp": colTag,
+		"operator": colKeyword, "decorator": colTag,
+	}
+}
+
+// stripTheme removes iNiR color customizations from a settings.json
+func stripTheme(settingsPath string) bool {
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		return true // nothing to strip
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return false
+	}
+	changed := false
+	for _, key := range []string{"workbench.colorCustomizations", "editor.tokenColorCustomizations", "editor.semanticTokenColorCustomizations"} {
+		if _, ok := settings[key]; ok {
+			delete(settings, key)
+			changed = true
+		}
+	}
+	if !changed {
+		return true
+	}
+	if err := writeSettings(settingsPath, settings); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write %s: %v\n", settingsPath, err)
+		return false
+	}
+	fmt.Printf("✓ Stripped iNiR theme from %s\n", settingsPath)
+	return true
+}
+
+func stripAllThemes(forks []string) map[string]bool {
+	selected := forks
+	if len(selected) == 0 {
+		for key, name := range vscodeForks {
+			path := getSettingsPath(name)
+			if _, err := os.Stat(path); err == nil {
+				selected = append(selected, key)
+			}
+		}
+	}
+	results := map[string]bool{}
+	for _, forkKey := range selected {
+		forkName, ok := vscodeForks[forkKey]
+		if !ok {
+			continue
+		}
+		path := getSettingsPath(forkName)
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		results[forkKey] = stripTheme(path)
+		if results[forkKey] {
+			fmt.Printf("  ✓ %s\n", forkName)
+		} else {
+			fmt.Fprintf(os.Stderr, "  ✗ %s\n", forkName)
+		}
+	}
+	return results
 }
 
 func loadSettings(path string) (map[string]any, error) {
@@ -329,7 +580,9 @@ func parseSCSS(path string) (map[string]string, error) {
 	return out, nil
 }
 
-func getSettingsPath(forkName string) string { return filepath.Join(configDir(), forkName, "User", "settings.json") }
+func getSettingsPath(forkName string) string {
+	return filepath.Join(configDir(), forkName, "User", "settings.json")
+}
 func configDir() string {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return xdg

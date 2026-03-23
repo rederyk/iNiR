@@ -17,6 +17,7 @@ Singleton {
     id: root
     property string filePath: Directories.generatedMaterialThemePath
     property bool ready: false
+    property bool _schemeVariantPending: false
 
     readonly property bool defaultApplyExternal: (Quickshell.env("QS_NO_RELOAD_POPUP") ?? "") !== "1"
 
@@ -39,6 +40,26 @@ Singleton {
         darkModeProc.running = true
     }
 
+    // Apply a scheme variant using a seed color (for non-auto themes).
+    // Generates new Material colors from the given seed hex via matugen, then applies them.
+    function applySchemeVariant(seedColor: string, variant: string): void {
+        root._schemeVariantPending = true
+        schemeVariantProc.command = [
+            "/usr/bin/bash",
+            Directories.wallpaperSwitchScriptPath,
+            "--noswitch",
+            "--color", seedColor,
+            "--type", variant
+        ]
+        schemeVariantProc.running = true
+    }
+
+    Process {
+        id: schemeVariantProc
+        running: false
+        onExited: root.scheduleReload()
+    }
+
     Process {
         id: darkModeProc
         running: false
@@ -46,11 +67,12 @@ Singleton {
     }
 
     function applyColors(fileContent) {
-        // Only apply wallpaper colors when auto theme is selected
-        // When a manual theme is active, ThemePresets handles the colors
-        if (!root.isAutoTheme) {
+        // Only apply wallpaper colors when auto theme is selected or a scheme variant change is pending.
+        // When a manual theme is active (without variant override), ThemePresets handles the colors.
+        if (!root.isAutoTheme && !root._schemeVariantPending) {
             return;
         }
+        root._schemeVariantPending = false
 
         if (!fileContent || fileContent.trim().length === 0) {
             return
