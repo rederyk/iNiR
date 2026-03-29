@@ -1176,7 +1176,7 @@ Item {
                                     : ((Battery.percentage * 100) ?? 0) > 20 ? "battery_2_bar" : "battery_1_bar"
                                 iconSize: 14
                                 fill: 1
-                                color: ((Battery.percentage * 100) ?? 0) <= 20 && !Battery.isCharging ? Appearance.colors.colError
+                                color: (Battery.percentage * 100) <= 20 && !Battery.isCharging ? Appearance.colors.colError
                                     : Battery.isCharging ? Appearance.colors.colTertiary
                                     : root.colSubtext
                             }
