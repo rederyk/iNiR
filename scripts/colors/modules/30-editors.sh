@@ -12,6 +12,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VSCODE_THEMEGEN_BIN="$STATE_DIR/user/generated/bin/inir-vscode-themegen"
 OPENCODE_THEMEGEN_BIN="$STATE_DIR/user/generated/bin/inir-opencode-themegen"
 ZED_THEMEGEN_BIN="$STATE_DIR/user/generated/bin/inir-zed-themegen"
+NEOVIM_CONFIG_DIR="$XDG_CONFIG_HOME/nvim"
+NEOVIM_PLUGIN_DIR="$NEOVIM_CONFIG_DIR/lua/plugins"
+NEOVIM_THEME_FILE="$NEOVIM_PLUGIN_DIR/neovim.lua"
 
 ensure_vscode_themegen() {
   command -v go &>/dev/null || return 1
@@ -40,6 +43,121 @@ ensure_zed_themegen() {
   [[ -x "$ZED_THEMEGEN_BIN" ]]
 }
 
+json_color() {
+  local file_path="$1"
+  local key="$2"
+  local fallback="$3"
+  if [[ -f "$file_path" ]]; then
+    jq -r --arg key "$key" --arg fallback "$fallback" '.[$key] // $fallback' "$file_path" 2>/dev/null || printf '%s\n' "$fallback"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
+generate_neovim_spec() {
+  local colors_file="$1"
+  local terminal_file="$2"
+  local background fg dark_bg darker_bg lighter_bg
+  local dark_fg light_fg bright_fg muted
+  local red yellow orange green cyan blue purple brown
+  local bright_red bright_yellow bright_green bright_cyan bright_blue bright_purple
+  local accent selection selection_fg
+
+  background=$(json_color "$colors_file" background "#151311")
+  fg=$(json_color "$colors_file" on_background "#E8E1DE")
+  dark_bg=$(json_color "$colors_file" surface_container_low "#1E1B19")
+  darker_bg=$(json_color "$colors_file" surface_container_lowest "#100D0C")
+  lighter_bg=$(json_color "$colors_file" surface_container_highest "#383432")
+
+  dark_fg=$(json_color "$colors_file" on_surface_variant "#CFC4BD")
+  light_fg=$(json_color "$terminal_file" term15 "$fg")
+  bright_fg=$(json_color "$colors_file" inverse_surface "$light_fg")
+  muted=$(json_color "$colors_file" outline "#998F88")
+
+  red=$(json_color "$terminal_file" term1 "#CA917F")
+  yellow=$(json_color "$terminal_file" term11 "#E2CBB5")
+  orange=$(json_color "$colors_file" primary "#F3D9C5")
+  green=$(json_color "$terminal_file" term2 "#BBBB97")
+  cyan=$(json_color "$terminal_file" term6 "#B5C8AA")
+  blue=$(json_color "$terminal_file" term4 "#B19FB6")
+  purple=$(json_color "$terminal_file" term5 "#BF9EA4")
+  brown=$(json_color "$colors_file" secondary_container "#50443B")
+
+  bright_red=$(json_color "$terminal_file" term9 "#DDB2A6")
+  bright_yellow=$(json_color "$terminal_file" term11 "$yellow")
+  bright_green=$(json_color "$terminal_file" term10 "#D4D4B0")
+  bright_cyan=$(json_color "$terminal_file" term14 "#D6E9CA")
+  bright_blue=$(json_color "$terminal_file" term12 "#D2C0D9")
+  bright_purple=$(json_color "$terminal_file" term13 "#E0BFC6")
+
+  accent=$(json_color "$colors_file" primary "$blue")
+  selection=$(json_color "$colors_file" surface_container_high "#2D2928")
+  selection_fg="$fg"
+
+  mkdir -p "$NEOVIM_PLUGIN_DIR"
+  local tmp_file="${NEOVIM_THEME_FILE}.tmp"
+  cat > "$tmp_file" <<EOF
+return {
+  {
+    "bjarneo/aether.nvim",
+    branch = "v3",
+    name = "aether",
+    priority = 1000,
+    opts = {
+      colors = {
+        bg = "$background",
+        dark_bg = "$dark_bg",
+        darker_bg = "$darker_bg",
+        lighter_bg = "$lighter_bg",
+
+        fg = "$fg",
+        dark_fg = "$dark_fg",
+        light_fg = "$light_fg",
+        bright_fg = "$bright_fg",
+        muted = "$muted",
+
+        red = "$red",
+        yellow = "$yellow",
+        orange = "$orange",
+        green = "$green",
+        cyan = "$cyan",
+        blue = "$blue",
+        purple = "$purple",
+        brown = "$brown",
+
+        bright_red = "$bright_red",
+        bright_yellow = "$bright_yellow",
+        bright_green = "$bright_green",
+        bright_cyan = "$bright_cyan",
+        bright_blue = "$bright_blue",
+        bright_purple = "$bright_purple",
+
+        accent = "$accent",
+        cursor = "$fg",
+        foreground = "$fg",
+        background = "$background",
+        selection = "$selection",
+        selection_foreground = "$selection_fg",
+        selection_background = "$selection",
+      },
+    },
+    config = function(_, opts)
+      require("aether").setup(opts)
+      vim.cmd.colorscheme("aether")
+      require("aether.hotreload").setup()
+    end,
+  },
+  {
+    "LazyVim/LazyVim",
+    opts = {
+      colorscheme = "aether",
+    },
+  },
+}
+EOF
+  mv "$tmp_file" "$NEOVIM_THEME_FILE"
+}
+
 apply_code_editors() {
   [[ -f "$SCSS_FILE" ]] || return 0
   local colors_file="$PALETTE_FILE"
@@ -47,9 +165,14 @@ apply_code_editors() {
   local python_cmd
   python_cmd=$(venv_python)
 
-  local enable_zed enable_vscode
+  local enable_zed enable_vscode enable_neovim
   enable_zed=$(config_json 'if .appearance.wallpaperTheming | has("enableZed") then .appearance.wallpaperTheming.enableZed else true end' true)
   enable_vscode=$(config_json 'if .appearance.wallpaperTheming | has("enableVSCode") then .appearance.wallpaperTheming.enableVSCode else true end' true)
+  enable_neovim=$(config_json 'if .appearance.wallpaperTheming | has("enableNeovim") then .appearance.wallpaperTheming.enableNeovim else true end' true)
+
+  if [[ "$enable_neovim" == 'true' ]] && [[ -d "$NEOVIM_CONFIG_DIR" || -x "$(command -v nvim 2>/dev/null)" ]]; then
+    generate_neovim_spec "$colors_file" "$TERMINAL_FILE"
+  fi
 
   if [[ "$enable_zed" == 'true' ]] && { command -v zed &>/dev/null || command -v zeditor &>/dev/null; }; then
     if ensure_zed_themegen; then
