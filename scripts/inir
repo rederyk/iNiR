@@ -1741,11 +1741,27 @@ case "$command_name" in
         _comp_shell="${1:-}"
         case "$_comp_shell" in
             bash|zsh|fish)
-                _comp_file="$script_dir/completions/inir.${_comp_shell}"
-                if [[ -f "$_comp_file" ]]; then
+                _comp_candidates=(
+                    "$script_dir/completions/inir.${_comp_shell}"
+                    "$launcher_root/share/quickshell/inir/scripts/completions/inir.${_comp_shell}"
+                    "$user_config_dir/scripts/completions/inir.${_comp_shell}"
+                    "$system_config_dir/scripts/completions/inir.${_comp_shell}"
+                    "$fallback_system_config_dir/scripts/completions/inir.${_comp_shell}"
+                )
+                _comp_file=""
+                for _cand in "${_comp_candidates[@]}"; do
+                    if [[ -f "$_cand" ]]; then
+                        _comp_file="$_cand"
+                        break
+                    fi
+                done
+                if [[ -n "$_comp_file" ]]; then
                     cat "$_comp_file"
                 else
-                    printf "Error: %s completion file not found at %s\n" "$_comp_shell" "$_comp_file" >&2
+                    printf "Error: %s completion file not found. Searched:\n" "$_comp_shell" >&2
+                    for _cand in "${_comp_candidates[@]}"; do
+                        printf "  %s\n" "$_cand" >&2
+                    done
                     exit 1
                 fi
                 ;;

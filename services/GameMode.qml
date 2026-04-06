@@ -89,8 +89,10 @@ Singleton {
         function toggle(): void { root.toggle() }
         function activate(): void { root.activate() }
         function deactivate(): void { root.deactivate() }
-        function status(): void { 
-            root._log("[GameMode] Status - active:", root.active, "manual:", root._manualActive, "auto:", root._autoActive)
+        function status(): string {
+            const state = root.active ? "active" : "inactive";
+            const detail = root._manualActive ? "manual" : root._autoActive ? "auto" : "off";
+            return state + " (" + detail + ")";
         }
     }
 
