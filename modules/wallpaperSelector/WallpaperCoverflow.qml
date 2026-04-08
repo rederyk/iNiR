@@ -195,7 +195,8 @@ Scope {
                 //  because the Loader creates us AFTER coverflowSelectorOpen changed)
                 const wp = root.currentSelectionPath
                 const wpDir = FileUtils.parentDirectory(FileUtils.trimFileProtocol(String(wp)))
-                if (wpDir && wpDir.length > 0)
+                const currentDir = Wallpapers.effectiveDirectory
+                if (wpDir && wpDir.length > 0 && currentDir !== wpDir)
                     Wallpapers.setDirectory(wpDir)
                 Wallpapers.searchQuery = ""
                 // Update thumbnails on the active view
@@ -355,34 +356,10 @@ Scope {
                     folderModel: Wallpapers.folderModel
                     currentWallpaperPath: root.currentSelectionPath
 
-                    // Staggered entry animation
-                    transformOrigin: Item.Center
-                    scale: panelWindow._contentReady ? 1.0 : 0.92
-                    opacity: panelWindow._contentReady ? 1.0 : 0.0
-                    y: panelWindow._contentReady ? 0 : 18
-                    Behavior on scale {
-                        enabled: Appearance.animationsEnabled
-                        NumberAnimation {
-                            duration: Appearance.calcEffectiveDuration(420)
-                            easing.type: Appearance.animation.elementMoveEnter.type
-                            easing.bezierCurve: Appearance.animation.elementMoveEnter.bezierCurve
-                        }
-                    }
-                    Behavior on opacity {
-                        enabled: Appearance.animationsEnabled
-                        NumberAnimation {
-                            duration: Appearance.calcEffectiveDuration(300)
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-                    Behavior on y {
-                        enabled: Appearance.animationsEnabled
-                        NumberAnimation {
-                            duration: Appearance.calcEffectiveDuration(380)
-                            easing.type: Appearance.animation.elementMoveEnter.type
-                            easing.bezierCurve: Appearance.animation.elementMoveEnter.bezierCurve
-                        }
-                    }
+                    // SkewView manages its own staggered enter/exit internally
+                    // via _contentVisible. We only feed it the parent's ready signal
+                    // so it knows when to reverse (close animation).
+                    contentReady: panelWindow._contentReady
 
                     onWallpaperSelected: filePath => {
                         root.selectWallpaperPath(filePath, skewContent.useDarkMode)
@@ -414,7 +391,8 @@ Scope {
                         root.captureSelectedMonitor()
                         const wp = root.currentSelectionPath
                         const wpDir = FileUtils.parentDirectory(FileUtils.trimFileProtocol(String(wp)))
-                        if (wpDir && wpDir.length > 0)
+                        const currentDir = Wallpapers.effectiveDirectory
+                        if (wpDir && wpDir.length > 0 && currentDir !== wpDir)
                             Wallpapers.setDirectory(wpDir)
                         Wallpapers.searchQuery = ""
                         // Update thumbnails on the active view
