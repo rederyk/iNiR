@@ -81,9 +81,6 @@ Singleton {
     readonly property bool disableDiscoverOverlay: Config.options?.gameMode?.disableDiscoverOverlay ?? true
     readonly property string _discoverOverlayServiceName: "discover-overlay.service"
 
-    // Fullscreen detection threshold (allow small margin for bar/gaps)
-    readonly property int _marginThreshold: 60
-    
     // Hysteresis: require multiple consecutive checks to change auto state
     property int _fullscreenCount: 0
     readonly property int _hysteresisThreshold: 2
@@ -130,47 +127,13 @@ Singleton {
         stateReader.reload()
     }
 
-    // Check if a window is fullscreen by comparing to output size
+    // Check if a window is fullscreen using niri's native is_fullscreen flag.
+    // The old size-based heuristic (60px margin) caused false positives on maximized
+    // windows with small gaps, triggering GameMode and all its side effects unexpectedly.
     function isWindowFullscreen(window) {
         if (!window) return false
         if (!CompositorService.isNiri) return false
-
-        // Get window size from layout
-        const layout = window.layout
-        if (!layout) return false
-        
-        const windowSize = layout.window_size
-        if (!windowSize || windowSize.length < 2) return false
-        
-        const windowWidth = windowSize[0]
-        const windowHeight = windowSize[1]
-
-        // Get output for this window's workspace
-        const workspaceId = window.workspace_id
-        const workspace = NiriService.allWorkspaces?.find(ws => ws.id === workspaceId)
-        if (!workspace || !workspace.output) return false
-
-        const output = NiriService.outputs?.[workspace.output]
-        if (!output) return false
-        
-        // Try logical first, then mode
-        let outputWidth, outputHeight
-        if (output.logical) {
-            outputWidth = output.logical.width
-            outputHeight = output.logical.height
-        } else if (output.current_mode !== undefined && output.modes) {
-            const mode = output.modes[output.current_mode]
-            outputWidth = mode?.width
-            outputHeight = mode?.height
-        }
-        
-        if (!outputWidth || !outputHeight) return false
-
-        // Window is fullscreen if it covers most of the output
-        const widthMatch = windowWidth >= (outputWidth - _marginThreshold)
-        const heightMatch = windowHeight >= (outputHeight - _marginThreshold)
-
-        return widthMatch && heightMatch
+        return window.is_fullscreen === true
     }
     
     // Check if ANY window across all workspaces is fullscreen
@@ -437,27 +400,13 @@ Singleton {
     Process {
         id: discoverOverlayStopProc
         command: [
-            "/usr/bin/systemctl",
-            "--user",
-            "stop",
-            root._discoverOverlayServiceName
+            "/usr/bin/bash",
+            "-c",
+            "systemctl --user stop " + root._discoverOverlayServiceName + " 2>/dev/null; " +
+            "pkill -x discover-overlay 2>/dev/null; true"
         ]
         onExited: (code, status) => {
-            root._log("[GameMode] systemctl stop exited:", code)
-            // Ensure stray processes are gone even if service was not the parent.
-            discoverOverlayKillProc.running = true
-        }
-    }
-
-    Process {
-        id: discoverOverlayKillProc
-        command: [
-            "/usr/bin/pkill",
-            "-f",
-            "/usr/bin/discover-overlay"
-        ]
-        onExited: (code, status) => {
-            root._log("[GameMode] pkill discover-overlay exited:", code)
+            root._log("[GameMode] discover-overlay stop exited:", code)
         }
     }
 
