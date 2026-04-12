@@ -1322,6 +1322,7 @@
         "iiClipboard",
         "iiShellUpdate"
     ],
+    "knownPanels": [],
     "powerProfiles": {
         "restoreOnStart": true,
         "preferredProfile": ""

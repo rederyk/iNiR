@@ -125,6 +125,7 @@ Singleton {
                 "iiOverview", "iiPolkit", "iiRegionSelector", "iiScreenCorners", "iiSessionScreen",
                 "iiSidebarLeft", "iiSidebarRight", "iiTilingOverlay", "iiVerticalBar", "iiWallpaperSelector", "iiCoverflowSelector", "iiClipboard", "iiShellUpdate"
             ]
+            property list<string> knownPanels: [] // Tracks panels the user has seen; used to distinguish "user disabled" from "new in update"
             property string panelFamily: "ii" // "ii" or "waffle"
             property bool familyTransitionAnimation: true // Show animated overlay when switching families
 
