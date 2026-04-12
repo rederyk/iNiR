@@ -281,7 +281,17 @@ Singleton {
         objects: [rawSink, sink, source]
     }
 
+    // Reset protection state and stop any in-flight ramp when sink changes so
+    // the new sink's initial volume isn't compared against the old sink's level
+    // and we don't apply a stale ramp target to the wrong device.
+    onSinkChanged: {
+        _sinkProtectionConn.lastReady = false
+        _sinkProtectionConn.lastVolume = 0
+        _rampTimerInternal.running = false
+    }
+
     Connections { // Protection against sudden volume changes
+        id: _sinkProtectionConn
         target: sink?.audio ?? null
         property bool lastReady: false
         property real lastVolume: 0
