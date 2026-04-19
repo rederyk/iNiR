@@ -22,6 +22,7 @@ import qs.modules.wallpaperSelector
 import qs.modules.ii.overlay
 import qs.modules.shellUpdate
 import "modules/clipboard" as ClipboardModule
+import "modules/keepass" as KeepassModule
 
 import QtQuick
 import Quickshell
@@ -77,6 +78,7 @@ Item {
     DeferredPanelLoader { identifier: "iiClipboard"; component: ClipboardModule.ClipboardPanel {} }
     DeferredPanelLoader { identifier: "iiShellUpdate"; component: ShellUpdateOverlay {} }
     DeferredPanelLoader { identifier: "iiRecordingOsd"; component: RecordingOsd {} }
+    DeferredPanelLoader { identifier: "iiKeepass"; component: KeepassModule.KeepassPanel {} }
 
     LazyLoader {
         active: Config.ready && (Config.options?.background?.effects?.ripple?.enable ?? false)
