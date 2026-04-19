@@ -501,6 +501,24 @@ bind "Mod+Shift+W" { spawn "inir" "panelFamily" "cycle"; }
 
 ---
 
+### keepass
+
+KeePass password manager overlay. Search entries, copy passwords/usernames, and add new entries.
+
+| Function | Description |
+|----------|-------------|
+| `toggle` | Open/close KeePass panel |
+| `add` | Open panel in "add entry" mode, pre-filling title from primary selection |
+
+```kdl
+bind "Mod+P" { spawn "inir" "keepass" "toggle"; }
+bind "Mod+Ctrl+P" { spawn "inir" "keepass" "add"; }
+```
+
+Requires `keepassxc` (for `keepassxc-cli`) and a `.kdbx` vault. The vault path defaults to `~/Nextcloud/secrets/end4dot-keepass.kdbx`; override with the `KP_VAULT_PATH` environment variable.
+
+---
+
 ### shellUpdate
 
 Shell update checker. Monitors the git repo for new commits and shows an update overlay.
