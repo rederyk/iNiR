@@ -723,6 +723,47 @@ ContentPage {
                 title: Translation.tr("Style: general")
 
                 SettingsSwitch {
+                    buttonIcon: "notifications"
+                    text: Translation.tr('Show notifications on lock screen')
+                    checked: Config.options?.lock?.notifications?.enable ?? false
+                    onCheckedChanged: {
+                        Config.setNestedValue("lock.notifications.enable", checked);
+                    }
+                    StyledToolTip {
+                        text: Translation.tr("Display recent notifications on the lock screen clock view")
+                    }
+                }
+
+                SettingsSwitch {
+                    visible: Config.options?.lock?.notifications?.enable ?? false
+                    buttonIcon: "visibility"
+                    text: Translation.tr('Show notification body text')
+                    checked: Config.options?.lock?.notifications?.showBody ?? true
+                    onCheckedChanged: {
+                        Config.setNestedValue("lock.notifications.showBody", checked);
+                    }
+                    StyledToolTip {
+                        text: Translation.tr("Display the message content of notifications. Disable for privacy.")
+                    }
+                }
+
+                ConfigSpinBox {
+                    visible: Config.options?.lock?.notifications?.enable ?? false
+                    icon: "format_list_numbered"
+                    text: Translation.tr("Max notifications shown")
+                    value: Config.options?.lock?.notifications?.maxCount ?? 3
+                    from: 1
+                    to: 10
+                    stepSize: 1
+                    onValueChanged: {
+                        Config.setNestedValue("lock.notifications.maxCount", value);
+                    }
+                    StyledToolTip {
+                        text: Translation.tr("Maximum number of notifications to display on the lock screen")
+                    }
+                }
+
+                SettingsSwitch {
                     buttonIcon: "center_focus_weak"
                     text: Translation.tr('Center clock')
                     checked: Config.options?.lock?.centerClock ?? false

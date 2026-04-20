@@ -22,6 +22,7 @@ MouseArea {
     // Show login view when explicitly switched OR when there's password text
     property bool showLoginView: currentView === "login"
     property bool hasAttemptedUnlock: false
+    property bool oskVisible: false
     
     readonly property bool requirePasswordToPower: Config.options?.lock?.security?.requirePasswordToPower ?? true
     readonly property bool blurEnabled: Config.options?.lock?.blur?.enable ?? true
@@ -232,16 +233,16 @@ MouseArea {
         ColumnLayout {
             anchors.centerIn: parent
             anchors.verticalCenterOffset: -80
-            spacing: 8
+            spacing: 4
             
             // Time
             Text {
                 id: clockText
                 Layout.alignment: Qt.AlignHCenter
                 text: Qt.formatTime(new Date(), "hh:mm")
-                font.pixelSize: Math.round(108 * Appearance.fontSizeScale)
-                font.weight: Font.DemiBold
-                font.family: Appearance.font.family.appearance
+                font.pixelSize: Math.round(112 * Appearance.fontSizeScale)
+                font.weight: Font.Light
+                font.family: Appearance.font.family.numbers
                 color: Appearance.colors.colOnSurface
                 
                 layer.enabled: Appearance.effectsEnabled
@@ -266,9 +267,10 @@ MouseArea {
                 id: dateText
                 Layout.alignment: Qt.AlignHCenter
                 text: Qt.formatDate(new Date(), "dddd, d MMMM")
-                font.pixelSize: Math.round(22 * Appearance.fontSizeScale)
+                font.pixelSize: Math.round(20 * Appearance.fontSizeScale)
                 font.weight: Font.Normal
-                font.family: Appearance.font.family.main
+                font.family: Appearance.font.family.title
+                font.letterSpacing: 0.5
                 color: Appearance.colors.colOnSurface
                 
                 layer.enabled: Appearance.effectsEnabled
@@ -305,6 +307,155 @@ MouseArea {
                 player: MprisController.activePlayer
                 width: 360
                 height: 120
+            }
+        }
+
+        // Lock screen notifications - read-only compact list
+        Loader {
+            id: lockNotificationsLoader
+            readonly property bool lockNotifEnabled: Config.options?.lock?.notifications?.enable ?? false
+            readonly property int lockNotifMaxCount: Config.options?.lock?.notifications?.maxCount ?? 3
+            readonly property bool lockNotifShowBody: Config.options?.lock?.notifications?.showBody ?? true
+            active: lockNotifEnabled && Notifications.list.length > 0
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+                top: mediaWidgetLoader.active ? mediaWidgetLoader.bottom : parent.verticalCenter
+                topMargin: mediaWidgetLoader.active ? 16 : 100
+                bottom: parent.bottom
+                bottomMargin: 80
+            }
+            width: Math.min(380, parent.width - 80)
+
+            sourceComponent: Column {
+                spacing: 8
+                clip: true
+
+                Repeater {
+                    model: {
+                        const all = Notifications.list
+                        const max = lockNotificationsLoader.lockNotifMaxCount
+                        return all.length > max ? all.slice(0, max) : all
+                    }
+
+                    delegate: Rectangle {
+                        id: notifDelegate
+                        required property var modelData
+                        width: parent.width
+                        height: notifContent.implicitHeight + 16
+                        radius: Appearance.rounding.normal
+                        color: ColorUtils.transparentize(Appearance.colors.colLayer1, 0.25)
+
+                        layer.enabled: Appearance.effectsEnabled
+                        layer.effect: DropShadow {
+                            horizontalOffset: 0
+                            verticalOffset: 2
+                            radius: 8
+                            samples: 17
+                            color: Qt.rgba(0, 0, 0, 0.3)
+                        }
+
+                        RowLayout {
+                            id: notifContent
+                            anchors {
+                                left: parent.left; right: parent.right
+                                verticalCenter: parent.verticalCenter
+                                margins: 12
+                            }
+                            spacing: 10
+
+                            // Notification image or app icon
+                            Loader {
+                                Layout.alignment: Qt.AlignTop
+                                Layout.preferredWidth: 28
+                                Layout.preferredHeight: 28
+                                active: true
+                                sourceComponent: Rectangle {
+                                    radius: Appearance.rounding.small
+                                    color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.7)
+                                    clip: true
+
+                                    Image {
+                                        id: notifImg
+                                        anchors.fill: parent
+                                        source: notifDelegate.modelData?.image || notifDelegate.modelData?.appIcon || ""
+                                        fillMode: Image.PreserveAspectCrop
+                                        asynchronous: true
+                                        visible: status === Image.Ready
+                                    }
+
+                                    MaterialSymbol {
+                                        anchors.centerIn: parent
+                                        text: "notifications"
+                                        iconSize: 16
+                                        color: Appearance.colors.colOnPrimary
+                                        visible: notifImg.status !== Image.Ready
+                                    }
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                // App name
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: notifDelegate.modelData?.appName ?? ""
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    font.weight: Font.Medium
+                                    font.family: Appearance.font.family.main
+                                    color: Appearance.colors.colOnSurfaceVariant
+                                    elide: Text.ElideRight
+                                    visible: text.length > 0
+                                }
+
+                                // Summary
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: notifDelegate.modelData?.summary ?? ""
+                                    font.pixelSize: Appearance.font.pixelSize.small
+                                    font.weight: Font.Medium
+                                    font.family: Appearance.font.family.main
+                                    color: Appearance.colors.colOnSurface
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                }
+
+                                // Body (optional, controlled by config)
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: lockNotificationsLoader.lockNotifShowBody && text.length > 0
+                                    text: notifDelegate.modelData?.body ?? ""
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    font.family: Appearance.font.family.main
+                                    color: Appearance.colors.colOnSurfaceVariant
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 2
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Overflow indicator
+                Text {
+                    visible: Notifications.list.length > lockNotificationsLoader.lockNotifMaxCount
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "+" + (Notifications.list.length - lockNotificationsLoader.lockNotifMaxCount) + " " + Translation.tr("more")
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    font.family: Appearance.font.family.main
+                    color: Appearance.colors.colOnSurfaceVariant
+
+                    layer.enabled: Appearance.effectsEnabled
+                    layer.effect: DropShadow {
+                        horizontalOffset: 0
+                        verticalOffset: 1
+                        radius: 4
+                        samples: 9
+                        color: Qt.rgba(0, 0, 0, 0.3)
+                    }
+                }
             }
         }
         
@@ -981,7 +1132,44 @@ MouseArea {
                     }
                 }
             }
+            
+            // On-screen keyboard toggle
+            LockIconButton {
+                icon: "keyboard"
+                tooltip: Translation.tr("Virtual keyboard")
+                toggled: root.oskVisible
+                anchors.verticalCenter: parent.verticalCenter
+                onClicked: root.oskVisible = !root.oskVisible
+            }
         }
+    }
+
+    // On-screen keyboard
+    LockKeyboard {
+        id: lockKeyboard
+        visible: root.oskVisible
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 80
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(parent.width * 0.6, 640)
+
+        onKeyClicked: key => {
+            loginPasswordField.text += key
+            loginPasswordField.forceActiveFocus()
+        }
+        onBackspaceClicked: {
+            if (loginPasswordField.text.length > 0) {
+                loginPasswordField.text = loginPasswordField.text.slice(0, -1)
+            }
+            loginPasswordField.forceActiveFocus()
+        }
+        onEnterClicked: {
+            if (root.context.currentText.length > 0) {
+                root.hasAttemptedUnlock = true
+                root.context.tryUnlock(root.ctrlHeld)
+            }
+        }
+        onCloseRequested: root.oskVisible = false
     }
 
     // ===== INPUT HANDLING =====

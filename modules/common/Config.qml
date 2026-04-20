@@ -881,6 +881,11 @@ Singleton {
                 }
                 property bool materialShapeChars: true
                 property bool enableAnimation: false // Play video/GIF wallpapers on lock screen (default: show first frame)
+                property JsonObject notifications: JsonObject {
+                    property bool enable: false
+                    property int maxCount: 3
+                    property bool showBody: true
+                }
             }
 
             property JsonObject media: JsonObject {

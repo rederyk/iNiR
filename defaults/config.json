@@ -584,6 +584,11 @@
     "launchOnStartup": false,
     "materialShapeChars": true,
     "enableAnimation": false,
+    "notifications": {
+      "enable": false,
+      "maxCount": 3,
+      "showBody": true
+    },
     "security": {
       "requirePasswordToPower": false,
       "unlockKeyring": true
