@@ -49,22 +49,6 @@ PanelWindow {
         onTriggered: root.visible = false
     }
 
-    // Keys must be on an Item — PanelWindow does not support Keys directly
-    Item {
-        id: keyHandler
-        anchors.fill: parent
-        focus: KeePass.open
-
-        Keys.onPressed: event => {
-            if (event.key === Qt.Key_Escape) {
-                if (KeePass.selectedEntry.length > 0)
-                    KeePass.openEntry("")
-                else
-                    KeePass.close()
-                event.accepted = true
-            }
-        }
-    }
 
     Rectangle {
         id: content
@@ -97,17 +81,55 @@ PanelWindow {
             spacing: 10
             focus: true
 
+            property bool showVaultPicker: !KeePass.vaultExists
+            onShowVaultPickerChanged: focusDefault()
+
+            Connections {
+                target: KeePass
+                function onVaultExistsChanged() {
+                    if (KeePass.vaultExists) panelColumn.showVaultPicker = false
+                }
+                function onOpenChanged() {
+                    if (!KeePass.open) panelColumn.showVaultPicker = !KeePass.vaultExists
+                }
+            }
+
             function focusDefault() {
                 if (!KeePass.open) return
+                if (showVaultPicker) {
+                    if (KeePass.availableVaults.length > 0)
+                        Qt.callLater(() => vaultPickerList.forceActiveFocus())
+                    else
+                        Qt.callLater(() => panelColumn.forceActiveFocus())
+                    return
+                }
                 if (!KeePass.unlocked) {
                     Qt.callLater(() => unlockPassword.forceActiveFocus())
                     return
                 }
                 if (KeePass.addMode) {
-                    Qt.callLater(() => addEntryName.forceActiveFocus())
+                    // Hold focus at panel level so arrows keep cycling tabs;
+                    // user taps Tab to enter the form fields
+                    Qt.callLater(() => panelColumn.forceActiveFocus())
                     return
                 }
                 Qt.callLater(() => filterField.forceActiveFocus())
+            }
+
+            function cycleTab(direction) {
+                if (!KeePass.unlocked) return
+                // 3 tab order: picker (0), entries (1), add (2)
+                const current = showVaultPicker ? 0 : (KeePass.addMode ? 2 : 1)
+                const next = (current + direction + 3) % 3
+                if (next === 0) {
+                    showVaultPicker = true
+                } else if (next === 1) {
+                    showVaultPicker = false
+                    KeePass.addMode = false
+                } else {
+                    showVaultPicker = false
+                    KeePass.addMode = true
+                }
             }
 
             Connections {
@@ -147,6 +169,22 @@ PanelWindow {
             }
 
             Keys.onPressed: event => {
+                if (event.key === Qt.Key_Escape) {
+                    if (KeePass.selectedEntry.length > 0) KeePass.openEntry("")
+                    else KeePass.close()
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                    panelColumn.cycleTab(event.key === Qt.Key_Right ? 1 : -1)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Alt && !event.isAutoRepeat
+                    && KeePass.unlocked && KeePass.selectedEntry.length > 0) {
+                    if (!KeePass.reveal) KeePass.showPassword()
+                    return
+                }
                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     if (!KeePass.unlocked) {
                         KeePass.unlock(unlockPassword.text)
@@ -162,13 +200,21 @@ PanelWindow {
                     }
                 }
             }
+            Keys.onReleased: event => {
+                if (event.key === Qt.Key_Alt) {
+                    KeePass.reveal = false
+                    KeePass.revealedPassword = ""
+                }
+            }
 
             // ── Header ───────────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
                 StyledText {
-                    text: KeePass.addMode ? Translation.tr("KeePass - Save") : Translation.tr("KeePass")
+                    text: KeePass.addMode ? Translation.tr("KeePass - Save")
+                        : KeePass.vaultExists ? Translation.tr("KeePass · %1").arg(KeePass.vaultName)
+                        : Translation.tr("KeePass")
                     font.pixelSize: Appearance.font.pixelSize.normal
                     color: Appearance.angelEverywhere ? Appearance.angel.colText
                          : Appearance.inirEverywhere  ? Appearance.inir.colOnLayer1
@@ -181,6 +227,7 @@ PanelWindow {
                     Layout.preferredHeight: 18
                     Layout.preferredWidth: timerLabel.implicitWidth + 12
                     buttonRadius: height / 2
+                    activeFocusOnTab: false
                     colBackground: Appearance.inirEverywhere ? Appearance.inir.colLayer0 : Appearance.colors.colLayer1
                     onClicked: KeePass.remainingTime = KeePass.cacheTtl
                     
@@ -212,10 +259,85 @@ PanelWindow {
                 }
 
                 Item { Layout.fillWidth: true } // Spacer
+
+                // ── Nav: Browse entries ──────────────────────────────────────
+                RippleButton {
+                    implicitWidth: 30
+                    implicitHeight: 30
+                    buttonRadius: Appearance.rounding.full
+                    activeFocusOnTab: false
+                    enabled: KeePass.vaultExists && KeePass.unlocked
+                    opacity: enabled ? 1.0 : 0.3
+                    colBackground: (KeePass.vaultExists && KeePass.unlocked && !panelColumn.showVaultPicker && !KeePass.addMode)
+                        ? (Appearance.inirEverywhere ? Appearance.inir.colPrimary : Appearance.colors.colPrimary)
+                        : "transparent"
+                    onClicked: {
+                        panelColumn.showVaultPicker = false
+                        KeePass.addMode = false
+                    }
+                    contentItem: MaterialSymbol {
+                        anchors.centerIn: parent
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "key"
+                        iconSize: Appearance.font.pixelSize.larger
+                        color: (KeePass.vaultExists && KeePass.unlocked && !panelColumn.showVaultPicker && !KeePass.addMode)
+                            ? (Appearance.inirEverywhere ? Appearance.inir.colOnPrimary : Appearance.colors.colOnPrimary)
+                            : (Appearance.inirEverywhere ? Appearance.inir.colOnLayer1 : Appearance.colors.colOnLayer1)
+                    }
+                }
+
+                // ── Nav: Add entry ───────────────────────────────────────────
+                RippleButton {
+                    implicitWidth: 30
+                    implicitHeight: 30
+                    buttonRadius: Appearance.rounding.full
+                    activeFocusOnTab: false
+                    enabled: KeePass.vaultExists && KeePass.unlocked
+                    opacity: enabled ? 1.0 : 0.3
+                    colBackground: (KeePass.vaultExists && KeePass.unlocked && !panelColumn.showVaultPicker && KeePass.addMode)
+                        ? (Appearance.inirEverywhere ? Appearance.inir.colPrimary : Appearance.colors.colPrimary)
+                        : "transparent"
+                    onClicked: {
+                        panelColumn.showVaultPicker = false
+                        KeePass.addMode = true
+                    }
+                    contentItem: MaterialSymbol {
+                        anchors.centerIn: parent
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "edit_note"
+                        iconSize: Appearance.font.pixelSize.larger
+                        color: (KeePass.vaultExists && KeePass.unlocked && !panelColumn.showVaultPicker && KeePass.addMode)
+                            ? (Appearance.inirEverywhere ? Appearance.inir.colOnPrimary : Appearance.colors.colOnPrimary)
+                            : (Appearance.inirEverywhere ? Appearance.inir.colOnLayer1 : Appearance.colors.colOnLayer1)
+                    }
+                }
+
+                // ── Nav: Vault selector ──────────────────────────────────────
+                RippleButton {
+                    implicitWidth: 30
+                    implicitHeight: 30
+                    buttonRadius: Appearance.rounding.full
+                    activeFocusOnTab: false
+                    colBackground: panelColumn.showVaultPicker
+                        ? (Appearance.inirEverywhere ? Appearance.inir.colPrimary : Appearance.colors.colPrimary)
+                        : "transparent"
+                    onClicked: panelColumn.showVaultPicker = !panelColumn.showVaultPicker
+                    contentItem: MaterialSymbol {
+                        anchors.centerIn: parent
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "folder_open"
+                        iconSize: Appearance.font.pixelSize.larger
+                        color: panelColumn.showVaultPicker
+                            ? (Appearance.inirEverywhere ? Appearance.inir.colOnPrimary : Appearance.colors.colOnPrimary)
+                            : (Appearance.inirEverywhere ? Appearance.inir.colOnLayer1 : Appearance.colors.colOnLayer1)
+                    }
+                }
+
                 RippleButton {
                     implicitWidth: 34
                     implicitHeight: 34
                     buttonRadius: Appearance.rounding.full
+                    activeFocusOnTab: false
                     colBackground: "transparent"
                     onClicked: if (KeePass.unlocked) KeePass.lock()
                     contentItem: MaterialSymbol {
@@ -230,13 +352,242 @@ PanelWindow {
                 }
                 IconToolbarButton {
                     text: "close"
+                    activeFocusOnTab: false
                     onClicked: KeePass.close()
+                }
+            }
+
+            // ── Unavailable banner (keepassxc-cli not installed) ─────────────
+            Rectangle {
+                visible: !KeePass.available
+                Layout.fillWidth: true
+                implicitHeight: unavailableColumn.implicitHeight + 16
+                radius: Appearance.angelEverywhere ? Appearance.angel.roundingNormal
+                      : Appearance.inirEverywhere  ? Appearance.inir.roundingNormal
+                      : Appearance.rounding.windowRounding
+                color: Appearance.inirEverywhere ? Appearance.inir.colLayer2 : Appearance.colors.colLayer1
+                border.color: Appearance.inirEverywhere ? Appearance.inir.colBorder : Appearance.colors.colLayer1Border
+
+                ColumnLayout {
+                    id: unavailableColumn
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 6
+                    StyledText {
+                        text: Translation.tr("keepassxc-cli not found")
+                        font.pixelSize: Appearance.font.pixelSize.normal
+                        font.weight: Font.Medium
+                        color: Appearance.inirEverywhere ? Appearance.inir.colError : Appearance.colors.colNegative
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: Translation.tr("Install the keepassxc package to use this feature.")
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        wrapMode: Text.WordWrap
+                        color: Appearance.inirEverywhere ? Appearance.inir.colTextSecondary : Appearance.colors.colOnSurfaceVariant
+                    }
+                }
+            }
+
+            // ── Vault picker panel (shown when no vault is selected/found) ───
+            Rectangle {
+                visible: KeePass.available && panelColumn.showVaultPicker && !KeePass.busy
+                Layout.fillWidth: true
+                implicitHeight: vaultPickerColumn.implicitHeight + 16
+
+                radius: Appearance.angelEverywhere ? Appearance.angel.roundingNormal
+                      : Appearance.inirEverywhere  ? Appearance.inir.roundingNormal
+                      : Appearance.rounding.windowRounding
+
+                color: Appearance.angelEverywhere  ? Appearance.angel.colGlassCard
+                     : Appearance.inirEverywhere   ? Appearance.inir.colLayer2
+                     : Appearance.auroraEverywhere ? Appearance.aurora.colElevatedSurface
+                     : Appearance.colors.colLayer1
+
+                border.color: Appearance.angelEverywhere  ? Appearance.angel.colCardBorder
+                            : Appearance.inirEverywhere   ? Appearance.inir.colBorder
+                            : Appearance.auroraEverywhere ? Appearance.aurora.colPopupBorder
+                            : Appearance.colors.colLayer1Border
+
+                ColumnLayout {
+                    id: vaultPickerColumn
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 8
+
+                    // ── Existing vaults list ─────────────────────────────────
+                    ColumnLayout {
+                        visible: KeePass.availableVaults.length > 0
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        StyledText {
+                            text: Translation.tr("Select a vault")
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            font.weight: Font.Medium
+                            color: Appearance.angelEverywhere ? Appearance.angel.colText
+                                 : Appearance.inirEverywhere  ? Appearance.inir.colOnLayer1
+                                 : Appearance.colors.colOnLayer1
+                        }
+
+                        ListView {
+                            id: vaultPickerList
+                            Layout.fillWidth: true
+                            implicitHeight: Math.min(260, contentHeight + 8)
+                            clip: true
+                            spacing: 4
+                            model: KeePass.availableVaults
+                            keyNavigationEnabled: false
+                            currentIndex: 0
+
+                            highlightFollowsCurrentItem: true
+                            highlightMoveDuration: 0
+                            highlight: Rectangle {
+                                width: vaultPickerList.width
+                                height: 36
+                                radius: height / 2
+                                color: Appearance.inirEverywhere ? Appearance.inir.colPrimary : Appearance.colors.colPrimary
+                            }
+
+                            delegate: DialogListItem {
+                                id: vaultDelegate
+                                required property string modelData
+                                readonly property bool isSelected: modelData === KeePass.vaultPath
+                                width: vaultPickerList.width
+                                implicitHeight: 36
+                                active: ListView.isCurrentItem
+                                focus: false
+                                activeFocusOnTab: false
+                                colBackground: "transparent"
+                                colBackgroundHover: Appearance.inirEverywhere ? Appearance.inir.colLayer1Hover : Appearance.colors.colLayer1Hover
+                                contentItem: RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 16
+                                    anchors.rightMargin: 16
+                                    MaterialSymbol {
+                                        text: (vaultDelegate.isSelected && KeePass.unlocked) ? "lock_open" : "lock"
+                                        iconSize: Appearance.font.pixelSize.normal
+                                        color: vaultDelegate.active
+                                            ? (Appearance.inirEverywhere ? Appearance.inir.colOnPrimary : Appearance.colors.colOnPrimary)
+                                            : vaultDelegate.isSelected
+                                                ? (Appearance.inirEverywhere ? Appearance.inir.colPrimary : Appearance.colors.colPrimary)
+                                                : (Appearance.inirEverywhere ? Appearance.inir.colTextSecondary : Appearance.colors.colOnSurfaceVariant)
+                                    }
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        text: modelData.substring(modelData.lastIndexOf("/") + 1)
+                                        font.pixelSize: Appearance.font.pixelSize.small
+                                        color: vaultDelegate.active
+                                            ? (Appearance.inirEverywhere ? Appearance.inir.colOnPrimary : Appearance.colors.colOnPrimary)
+                                            : vaultDelegate.isSelected
+                                                ? (Appearance.inirEverywhere ? Appearance.inir.colPrimary : Appearance.colors.colPrimary)
+                                                : (Appearance.inirEverywhere ? Appearance.inir.colOnLayer1 : Appearance.colors.colOnLayer1)
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                                onClicked: {
+                                    KeePass.selectVault(modelData)
+                                    panelColumn.showVaultPicker = false
+                                }
+                            }
+
+                            Keys.onPressed: event => {
+                                if (event.key === Qt.Key_Down) {
+                                    currentIndex = Math.min(count - 1, currentIndex + 1)
+                                    event.accepted = true
+                                } else if (event.key === Qt.Key_Up) {
+                                    currentIndex = Math.max(0, currentIndex - 1)
+                                    event.accepted = true
+                                } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && currentIndex >= 0 && count > 0) {
+                                    KeePass.selectVault(model[currentIndex])
+                                    panelColumn.showVaultPicker = false
+                                    event.accepted = true
+                                } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                                    panelColumn.cycleTab(event.key === Qt.Key_Right ? 1 : -1)
+                                    event.accepted = true
+                                }
+                            }
+                        }
+
+                        // Divider
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 1
+                            color: Appearance.inirEverywhere ? Appearance.inir.colBorder : Appearance.colors.colLayer1Border
+                            opacity: 0.5
+                        }
+                    }
+
+                    // ── Create new vault ─────────────────────────────────────
+                    StyledText {
+                        text: Translation.tr("Create new vault")
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        font.weight: Font.Medium
+                        color: Appearance.angelEverywhere ? Appearance.angel.colText
+                             : Appearance.inirEverywhere  ? Appearance.inir.colOnLayer1
+                             : Appearance.colors.colOnLayer1
+                    }
+
+                    ToolbarTextField {
+                        id: newVaultName
+                        Layout.fillWidth: true
+                        placeholderText: Translation.tr("Vault name (e.g. personal)")
+                    }
+
+                    ToolbarTextField {
+                        id: newVaultPassword
+                        Layout.fillWidth: true
+                        placeholderText: Translation.tr("Password")
+                        echoMode: TextInput.Password
+                    }
+
+                    ToolbarTextField {
+                        id: newVaultConfirm
+                        Layout.fillWidth: true
+                        placeholderText: Translation.tr("Confirm password")
+                        echoMode: TextInput.Password
+                        onAccepted: {
+                            if (newVaultConfirm.text !== newVaultPassword.text) {
+                                KeePass.lastError = Translation.tr("Passwords do not match")
+                                return
+                            }
+                            KeePass.createVault(newVaultName.text, newVaultPassword.text)
+                            newVaultName.text = ""
+                            newVaultPassword.text = ""
+                            newVaultConfirm.text = ""
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: 8
+                        DialogButton {
+                            buttonText: Translation.tr("Create")
+                            activeFocusOnTab: false
+                            buttonRadius: height / 2
+                            onClicked: {
+                                if (newVaultConfirm.text !== newVaultPassword.text) {
+                                    KeePass.lastError = Translation.tr("Passwords do not match")
+                                    return
+                                }
+                                KeePass.createVault(newVaultName.text, newVaultPassword.text)
+                                newVaultName.text = ""
+                                newVaultPassword.text = ""
+                                newVaultConfirm.text = ""
+                            }
+                        }
+                        DialogButton {
+                            buttonText: Translation.tr("Cancel")
+                            activeFocusOnTab: false
+                            buttonRadius: height / 2
+                            onClicked: KeePass.close()
+                        }
+                    }
                 }
             }
 
             // ── Unlock panel ─────────────────────────────────────────────────
             Rectangle {
-                visible: !KeePass.unlocked
+                visible: KeePass.available && !panelColumn.showVaultPicker && KeePass.vaultExists && !KeePass.unlocked
                 Layout.fillWidth: true
                 implicitHeight: unlockColumn.implicitHeight + 16
 
@@ -348,7 +699,7 @@ PanelWindow {
 
             // ── Entry list & detail ──────────────────────────────────────────
             ColumnLayout {
-                visible: KeePass.unlocked && !KeePass.addMode
+                visible: KeePass.available && !panelColumn.showVaultPicker && KeePass.vaultExists && KeePass.unlocked && !KeePass.addMode
                 spacing: 8
 
                 ToolbarTextField {
@@ -424,7 +775,10 @@ PanelWindow {
                             if (KeePass.selectedEntry === entry) KeePass.copyPassword()
                             else KeePass.openEntry(entry)
                             event.accepted = true
-                        } else if (event.text.length > 0 && event.text.trim() !== "") {
+                        } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                            panelColumn.cycleTab(event.key === Qt.Key_Right ? 1 : -1)
+                            event.accepted = true
+                        } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 0x20) {
                             filterField.forceActiveFocus()
                             filterField.text += event.text
                             filterField.cursorPosition = filterField.text.length
@@ -433,7 +787,7 @@ PanelWindow {
                     }
                 }
 
-                // Entry detail card — Escape (keyHandler) or X closes it
+                // Entry detail card — Escape or X closes it
                 Rectangle {
                     visible: KeePass.selectedEntry.length > 0
                     Layout.fillWidth: true
@@ -546,7 +900,7 @@ PanelWindow {
             // ── Add entry panel ──────────────────────────────────────────────
             ColumnLayout {
                 id: addPanel
-                visible: KeePass.unlocked && KeePass.addMode
+                visible: KeePass.available && !panelColumn.showVaultPicker && KeePass.vaultExists && KeePass.unlocked && KeePass.addMode
                 spacing: 8
 
                 property bool addPasswordVisible: false

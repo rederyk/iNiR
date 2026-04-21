@@ -13,10 +13,19 @@ Singleton {
     id: root
 
     property string scriptPath: FileUtils.trimFileProtocol(`${Directories.config}/quickshell/inir/scripts/quickshell-keepass`)
-    property string vaultPath: Config.options?.keepass?.vaultPath
-        || FileUtils.trimFileProtocol(`${Directories.home}/.local/share/keepassqs/vault.kdbx`)
+    readonly property string vaultDir: Config.options?.keepass?.vaultDir
+        || FileUtils.trimFileProtocol(`${Directories.home}/.local/share/keepassqs`)
+    property string vaultPath: ""
+    readonly property string vaultName: {
+        if (vaultPath.length === 0) return ""
+        const n = vaultPath.split("/").pop()
+        return n.endsWith(".kdbx") ? n.slice(0, -5) : n
+    }
 
+    property bool available: true
     property bool open: false
+    property bool vaultExists: false
+    property list<string> availableVaults: []
     property bool addMode: false
     property bool unlocked: false
     property bool busy: false
@@ -58,18 +67,53 @@ Singleton {
         lastError = ""
     }
 
+    function scanVaults() {
+        scanProc.exec(["find", root.vaultDir, "-maxdepth", "1", "-name", "*.kdbx", "-type", "f"])
+    }
+
+    function selectVault(path) {
+        if (vaultPath.length > 0 && path !== vaultPath) {
+            lockProc.exec({
+                environment: { KP_VAULT_PATH: root.vaultPath },
+                command: [scriptPath, "lock"]
+            })
+        }
+        vaultPath = path
+        vaultExists = true
+        resetSensitive()
+    }
+
+    function createVault(name, passwordValue) {
+        if (!name || name.trim().length === 0) {
+            lastError = Translation.tr("Missing vault name")
+            return
+        }
+        if (!passwordValue || passwordValue.trim().length === 0) {
+            lastError = Translation.tr("Missing password")
+            return
+        }
+        const safeName = name.trim().replace(/[^a-zA-Z0-9_\-]/g, "_")
+        const targetPath = root.vaultDir + "/" + safeName + ".kdbx"
+        busy = true
+        lastError = ""
+        createProc.targetPath = targetPath
+        createProc.exec({
+            environment: { KP_VAULT_PATH: targetPath },
+            command: [scriptPath, "create"]
+        })
+        createProc.write(passwordValue + "\n")
+    }
+
     function openList() {
         open = true
         addMode = false
-        // Don't resetSensitive here, or we lose background unlock state
-        refreshEntries()
+        scanVaults()
     }
 
     function openAdd() {
         open = true
         addMode = true
-        // Don't resetSensitive here
-        refreshEntries()
+        scanVaults()
     }
 
     function close() {
@@ -183,7 +227,48 @@ Singleton {
         })
     }
 
+    Component.onCompleted: availabilityProc.exec(["sh", "-c", "command -v keepassxc-cli >/dev/null 2>&1"])
+
     // ── Processes ────────────────────────────────────────────────────────────
+
+    Process {
+        id: availabilityProc
+        onExited: (exitCode) => { root.available = (exitCode === 0) }
+    }
+
+    Process {
+        id: scanProc
+        property list<string> buffer: []
+        stdout: SplitParser {
+            onRead: (line) => { if (line.trim().length > 0) scanProc.buffer.push(line.trim()) }
+        }
+        onStarted: scanProc.buffer = []
+        onExited: {
+            root.availableVaults = scanProc.buffer
+            root.vaultExists = root.availableVaults.includes(root.vaultPath)
+            if (root.vaultExists && root.open) root.refreshEntries()
+        }
+    }
+
+    Process {
+        id: createProc
+        property string targetPath: ""
+        stdinEnabled: true
+        stderr: StdioCollector { id: createErr }
+        onExited: (exitCode) => {
+            busy = false
+            if (exitCode === 0) {
+                root.vaultPath = createProc.targetPath
+                root.vaultExists = true
+                root.availableVaults = [...root.availableVaults, createProc.targetPath]
+                root.lastError = ""
+                root.refreshEntries()
+            } else {
+                const err = createErr.text.trim()
+                root.lastError = err.length > 0 ? err.replace("quickshell-keepass: ", "") : Translation.tr("Failed to create vault")
+            }
+        }
+    }
 
     Process { id: lockProc }
 
