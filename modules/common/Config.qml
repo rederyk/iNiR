@@ -1378,6 +1378,8 @@ Singleton {
             }
 
             property JsonObject screenRecord: JsonObject {
+                property bool showOsd: false
+                property bool showNotifications: true
                 property string savePath: "" // Empty = use XDG Videos or ~/Videos
                 property string qualityPreset: "balanced"
                 property string videoCodec: "libx264"

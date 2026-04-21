@@ -974,6 +974,8 @@
     "animatePreview": false
   },
   "screenRecord": {
+    "showOsd": false,
+    "showNotifications": true,
     "savePath": "",
     "qualityPreset": "balanced",
     "videoCodec": "libx264",
@@ -1313,8 +1315,7 @@
     "iiWallpaperSelector",
     "iiCoverflowSelector",
     "iiClipboard",
-    "iiShellUpdate",
-    "iiRecordingOsd"
+    "iiShellUpdate"
   ],
   "knownPanels": [],
   "powerProfiles": {
