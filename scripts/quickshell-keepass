@@ -6,14 +6,8 @@ if ! command -v keepassxc-cli >/dev/null 2>&1; then
   exit 127
 fi
 
-# Configuration
-KP_CONFIG="${KP_CONFIG:-$HOME/.config/keepassqs/config}"
-[[ -f "$KP_CONFIG" ]] && source "$KP_CONFIG"
-
 VAULT_PATH="${KP_VAULT_PATH:-$HOME/.local/share/keepassqs/vault.kdbx}"
 NONINTERACTIVE="${KP_NONINTERACTIVE:-0}"
-KP_GEN_LANG="${KP_GEN_LANG:-it}"
-KP_WORDLIST_DIR="${KP_WORDLIST_DIR:-$HOME/.config/keepassqs/wordlists}"
 
 # Secret Service attributes
 SECRET_ATTRS="inir keepass"
@@ -117,6 +111,16 @@ cmd_init() {
   printf -- '%s\n%s\n' "$password" "$password" | keepassxc-cli db-create -q -p "$VAULT_PATH"
   write_cache "$password"
   echo "Created vault: $VAULT_PATH"
+}
+
+cmd_create() {
+  [[ -f "$VAULT_PATH" ]] && die "vault already exists: $VAULT_PATH"
+  mkdir -p "$(dirname "$VAULT_PATH")"
+  local password
+  IFS= read -r password || die "empty password"
+  [[ -n "$password" ]] || die "empty password"
+  printf -- '%s\n%s\n' "$password" "$password" | keepassxc-cli db-create -q -p "$VAULT_PATH"
+  write_cache "$password"
 }
 
 cmd_lock() {
@@ -236,42 +240,59 @@ cmd_generate() {
     else
       words=("${_KP_WORDS_EN[@]}")
     fi
-    
-    local -a sel=(
-      "${words[$(( $(_kp_rand_u16) % ${#words[@]} ))]}"
-      "${words[$(( $(_kp_rand_u16) % ${#words[@]} ))]}"
-      "${words[$(( $(_kp_rand_u16) % ${#words[@]} ))]}"
-    )
+
+    # Length preset becomes a word-count proxy: short=2, medium=3, long=4
+    local num_words=3
+    if [[ "$length" -le 8 ]]; then num_words=2
+    elif [[ "$length" -gt 14 ]]; then num_words=4
+    fi
+
+    local -a sel=()
+    local i
+    for ((i=0; i<num_words; i++)); do
+      sel+=("${words[$(( $(_kp_rand_u16) % ${#words[@]} ))]}")
+    done
 
     if [[ "$use_upper" == "1" ]]; then
-       local -a idx=(0 1 2)
-       local -a s_idx=($(printf '%s\n' "${idx[@]}" | shuf | tr '\n' ' '))
-       sel[${s_idx[0]}]=$(echo "${sel[${s_idx[0]}]}" | tr '[:lower:]' '[:upper:]')
-       sel[${s_idx[1]}]=$(echo "${sel[${s_idx[1]}]}" | tr '[:upper:]' '[:lower:]')
-       if [[ $(( $(_kp_rand_u8) % 2 )) -eq 0 ]]; then
-         sel[${s_idx[2]}]=$(echo "${sel[${s_idx[2]}]}" | tr '[:lower:]' '[:upper:]')
-       else
-         sel[${s_idx[2]}]=$(echo "${sel[${s_idx[2]}]}" | tr '[:upper:]' '[:lower:]')
-       fi
+      local -a idx=()
+      for ((i=0; i<num_words; i++)); do idx+=("$i"); done
+      local -a s_idx=($(printf '%s\n' "${idx[@]}" | shuf | tr '\n' ' '))
+      sel[${s_idx[0]}]=$(echo "${sel[${s_idx[0]}]}" | tr '[:lower:]' '[:upper:]')
+      if [[ $num_words -ge 2 ]]; then
+        sel[${s_idx[1]}]=$(echo "${sel[${s_idx[1]}]}" | tr '[:upper:]' '[:lower:]')
+      fi
+      for ((i=2; i<num_words; i++)); do
+        if [[ $(( $(_kp_rand_u8) % 2 )) -eq 0 ]]; then
+          sel[${s_idx[i]}]=$(echo "${sel[${s_idx[i]}]}" | tr '[:lower:]' '[:upper:]')
+        else
+          sel[${s_idx[i]}]=$(echo "${sel[${s_idx[i]}]}" | tr '[:upper:]' '[:lower:]')
+        fi
+      done
     fi
 
-    local sep1=""
-    local sep2=""
+    local -a seps=()
     local syms='!@#$%^&*?-'
+    for ((i=0; i<num_words-1; i++)); do
+      local s=""
+      if [[ "$use_numbers" == "1" && "$use_symbols" == "1" ]]; then
+        if [[ $(( $(_kp_rand_u8) % 2 )) -eq 0 ]]; then
+          s="$(( $(_kp_rand_u8) % 10 ))"
+        else
+          s="${syms:$(( $(_kp_rand_u8) % ${#syms} )):1}"
+        fi
+      elif [[ "$use_numbers" == "1" ]]; then
+        s="$(( $(_kp_rand_u8) % 10 ))"
+      elif [[ "$use_symbols" == "1" ]]; then
+        s="${syms:$(( $(_kp_rand_u8) % ${#syms} )):1}"
+      fi
+      seps+=("$s")
+    done
 
-    if [[ "$use_numbers" == "1" && "$use_symbols" == "1" ]]; then
-       local n=$(( $(_kp_rand_u8) % 10 ))
-       local s="${syms:$(( $(_kp_rand_u8) % ${#syms} )):1}"
-       if [[ $(( $(_kp_rand_u8) % 2 )) -eq 0 ]]; then sep1="$n"; sep2="$s"; else sep1="$s"; sep2="$n"; fi
-    elif [[ "$use_numbers" == "1" ]]; then
-       sep1=$(( $(_kp_rand_u8) % 10 ))
-       sep2=$(( $(_kp_rand_u8) % 10 ))
-    elif [[ "$use_symbols" == "1" ]]; then
-       sep1="${syms:$(( $(_kp_rand_u8) % ${#syms} )):1}"
-       sep2="${syms:$(( $(_kp_rand_u8) % ${#syms} )):1}"
-    fi
-
-    printf '%s%s%s%s%s\n' "${sel[0]}" "$sep1" "${sel[1]}" "$sep2" "${sel[2]}"
+    local output="${sel[0]}"
+    for ((i=1; i<num_words; i++)); do
+      output+="${seps[i-1]}${sel[i]}"
+    done
+    printf '%s\n' "$output"
     return
   fi
 
@@ -339,6 +360,7 @@ main() {
   shift || true
   case "$cmd" in
     init) cmd_init "$@" ;;
+    create) cmd_create ;;
     status) cmd_status ;;
     lock) cmd_lock ;;
     unlock) cmd_unlock ;;

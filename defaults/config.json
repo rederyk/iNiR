@@ -1327,6 +1327,6 @@
     "duration": 5
   },
   "keepass": {
-    "vaultPath": ""
+    "vaultDir": ""
   }
 }

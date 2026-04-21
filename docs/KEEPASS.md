@@ -37,10 +37,37 @@ The integration features a persistent background timer:
 - `inir keepass toggle`: Opens or closes the KeePass panel.
 - `inir keepass add`: Opens the panel in "Add Entry" mode, automatically pasting the primary selection into the password field.
 
+### Keyboard shortcuts
+Default bindings (from `scripts/lib/ipc-registry.sh`):
+- `Super+P`: toggle the panel
+- `Super+Ctrl+P`: open the panel in "Add Entry" mode with the primary selection pre-filled
+
+Inside the panel:
+- `Enter` on the password field: unlock the vault
+- Start typing (in entries tab): focuses the search field
+- `Down` / `Up`: navigate the entry list or vault picker list; `Up` at the top of the entry list returns focus to search
+- `Enter` on a highlighted entry: open its detail card
+- `Enter` again on an open entry: copy the password to the clipboard
+- `Enter` on a highlighted vault (picker tab): open the unlock screen for it
+- `Left` / `Right`: cycle through the three tabs — picker → entries → add — when the vault is unlocked
+- `Tab`: enter the form fields on the create-vault or add-entry tabs (focus starts outside the fields so the arrows remain free for tab cycling)
+- **Hold `Alt`**: reveal the selected entry's password while held — releasing hides it again (avoids moving keyboard focus away from the list)
+- `Escape`: close the entry detail, or close the panel if no entry is open
+
 ### Configuration
-The integration uses the following environment variables (defined in `~/.config/keepassqs/config`):
-- `KP_VAULT_PATH`: Path to your `.kdbx` database.
-- `KP_GEN_LANG`: Language for word-based password generation (default: `it`).
+Configure the vault location in `~/.config/illogical-impulse/config.json`:
+
+```json
+"keepass": {
+  "vaultDir": "/path/to/your/vaults"
+}
+```
+
+- `keepass.vaultDir`: directory containing your `.kdbx` vaults (defaults to `~/.local/share/keepassqs`).
+
+Quickshell hot-reloads the config, so the panel picks up changes on the next toggle.
+
+The picker lists all `.kdbx` files found in that directory, and new vaults can be created from the UI. The word-based generator uses the wordlist from the active UI locale (via `Translation.tr("keepass_wordlist")`).
 
 ## Security Model
 1.  **Locking**: The database is locked and the keyring cache is cleared immediately when the timer reaches zero or the "Lock" button is pressed.

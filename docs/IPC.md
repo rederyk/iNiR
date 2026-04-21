@@ -515,7 +515,7 @@ bind "Mod+P" { spawn "inir" "keepass" "toggle"; }
 bind "Mod+Ctrl+P" { spawn "inir" "keepass" "add"; }
 ```
 
-Requires `keepassxc` (for `keepassxc-cli`) and a `.kdbx` vault. The vault path defaults to `~/Nextcloud/secrets/end4dot-keepass.kdbx`; override with the `KP_VAULT_PATH` environment variable.
+Requires `keepassxc` (for `keepassxc-cli`) and a `.kdbx` vault. Set `keepass.vaultDir` in the shell config to point at the directory containing your vaults (defaults to `~/.local/share/keepassqs`); existing vaults are listed in the picker, and new ones can be created from the UI.
 
 ---
 
