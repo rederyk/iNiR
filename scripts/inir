@@ -440,6 +440,27 @@ apply_hot_reload_policy_for_dir() {
     export INIR_DISABLE_HOT_RELOAD=1
 }
 
+# Cached systemd user environment — avoids duplicate blocking calls.
+# On fresh boot, `systemctl --user show-environment` can block for 10-30s
+# waiting for D-Bus session activation.  We call it once with a tight
+# timeout and cache the result for both apply_qt_runtime_env() and
+# ensure_systemd_graphical_env(), cutting worst-case startup from ~60s to ~3s.
+_cached_systemd_env=""
+_cached_systemd_env_fetched=false
+
+_get_systemd_user_env() {
+    if [[ "$_cached_systemd_env_fetched" == true ]]; then
+        printf '%s' "$_cached_systemd_env"
+        return 0
+    fi
+    _cached_systemd_env_fetched=true
+    # 3s timeout: if D-Bus isn't ready yet, bail out and let the shell start
+    # with whatever env it already has.  Apps launched later will inherit the
+    # full env from systemd once it catches up.
+    _cached_systemd_env="$(timeout 3s systemctl --user show-environment 2>/dev/null)" || true
+    printf '%s' "$_cached_systemd_env"
+}
+
 apply_qt_runtime_env() {
     # Ensure WAYLAND_DISPLAY is set — required for Qt to select the wayland
     # platform backend.  When systemd starts inir.service at boot, the
@@ -532,7 +553,7 @@ apply_qt_runtime_env() {
     #     because PATH is the bare systemd minimum.
     #   • Cursor theme/size are absent, so spawned apps render the default cursor.
     local _qs_sys_env
-    _qs_sys_env="$(systemctl --user show-environment 2>/dev/null)" || true
+    _qs_sys_env="$(_get_systemd_user_env)"
     if [[ -n "$_qs_sys_env" ]]; then
         local _qs_var _qs_val
         for _qs_var in XDG_SESSION_TYPE XDG_SESSION_DESKTOP DESKTOP_SESSION \
@@ -740,7 +761,7 @@ ensure_systemd_graphical_env() {
 
     # Check what systemd already has
     local sys_env
-    sys_env="$(systemctl --user show-environment 2>/dev/null || true)"
+    sys_env="$(_get_systemd_user_env)"
 
     # WAYLAND_DISPLAY — required for Quickshell to connect to compositor
     if ! grep -q '^WAYLAND_DISPLAY=' <<< "$sys_env" 2>/dev/null; then
@@ -850,7 +871,7 @@ ensure_systemd_graphical_env() {
     fi
 
     if [[ ${#vars_to_import[@]} -gt 0 ]]; then
-        systemctl --user set-environment "${vars_to_import[@]}" 2>/dev/null || true
+        timeout 3s systemctl --user set-environment "${vars_to_import[@]}" 2>/dev/null || true
     fi
 }
 
@@ -2012,7 +2033,7 @@ case "$command_name" in
         apply_shell_scale
         apply_qt_runtime_env
         apply_qt_logging_rules
-        ensure_systemd_graphical_env
+        ensure_systemd_graphical_env &  # env already cached by apply_qt_runtime_env
         check_qs_abi
         check_setup_version_sync "$config_dir"
         if has_instances "$config_dir"; then
