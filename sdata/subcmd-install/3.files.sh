@@ -580,13 +580,10 @@ if [[ -d "dots/.config/fontconfig" ]]; then
   install_dir__sync "dots/.config/fontconfig" "${XDG_CONFIG_HOME}/fontconfig"
 fi
 
-# illogical-impulse config.json (use defaults for distribution)
+# Config (use defaults for distribution)
 if [[ -f "defaults/config.json" ]]; then
   v mkdir -p "${DOTS_CORE_CONFDIR}"
   install_file__auto_backup "defaults/config.json" "${DOTS_CORE_CONFDIR}/config.json"
-elif [[ -f "dots/.config/illogical-impulse/config.json" ]]; then
-  # Fallback to dots (legacy)
-  install_file__auto_backup "dots/.config/illogical-impulse/config.json" "${DOTS_CORE_CONFDIR}/config.json"
 fi
 
 # DISABLED: WebApp plugins — requires quickshell-webengine rebuild, re-enable when ready
