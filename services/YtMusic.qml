@@ -275,6 +275,25 @@ Singleton {
         return ""
     }
 
+    function _isYoutubeUrl(url): bool {
+        const u = (url ?? "").toString().toLowerCase()
+        return u.includes("youtube.com") || u.includes("youtu.be")
+    }
+
+    function _extractPlaylistId(url): string {
+        const u = (url ?? "").toString()
+        if (!u) return ""
+        let m = u.match(/[?&]list=([A-Za-z0-9_-]+)/)
+        if (m && m[1]) return m[1]
+        m = u.match(/\/browse\/(VL[A-Za-z0-9_-]+)/)
+        if (m && m[1]) return m[1]
+        return ""
+    }
+
+    function _normalizeYoutubeUrl(url): string {
+        return (url ?? "").toString().trim()
+    }
+
     function _syncFromMpvPlayer(player): void {
         if (!player) return
 
@@ -428,99 +447,37 @@ Singleton {
         }
     }
 
-    // Detect if query is a YouTube URL (video or playlist)
-    function _isYoutubeUrl(url): bool {
-        const u = (url ?? "").toString().toLowerCase()
-        return u.includes("youtube.com") || u.includes("youtu.be") || u.includes("music.youtube.com")
-    }
-
-    // Detect if query is a Spotify URL (track or playlist)
-    function _isSpotifyUrl(url): bool {
-        const u = (url ?? "").toString().toLowerCase()
-        return u.includes("spotify.com") || u.startsWith("spotify:")
-    }
-
-    // Handle URL input - detect and route to appropriate handler
     function search(query): void {
         if (!query.trim() || !root.available) return
         root.error = ""
-        const q = query.trim()
-        
-        // Check if it's a YouTube URL
-        if (root._isYoutubeUrl(q)) {
-            root._handleYoutubeUrl(q)
-            _addToRecentSearches(q)
-            return
-        }
-        
-        // Check if it's a Spotify URL
-        if (root._isSpotifyUrl(q)) {
-            root._handleSpotifyUrl(q)
-            _addToRecentSearches(q)
-            return
-        }
-        
-        // Regular search
-        root.searching = true
-        root.searchResults = []
-        _searchQuery = q
-        _searchProc.running = true
-        _addToRecentSearches(q)
-    }
+        const trimmed = query.trim()
+        if (root._isYoutubeUrl(trimmed)) {
+            root.searching = true
+            root.searchResults = []
+            const normalizedUrl = root._normalizeYoutubeUrl(trimmed)
+            const videoId = root._extractVideoId(normalizedUrl)
+            const playlistId = root._extractPlaylistId(normalizedUrl)
 
-    // Handle YouTube URL (video or playlist)
-    function _handleYoutubeUrl(url): void {
-        root._log("[YtMusic] Handling YouTube URL:", url)
-        root.searching = true
-        root.searchResults = []
-        
-        // Check if it's a playlist (list= param)
-        const playlistMatch = url.match(/[?&]list=([A-Za-z0-9_-]+)/)
-        if (playlistMatch && playlistMatch[1]) {
-            root._log("[YtMusic] Detected YouTube playlist:", playlistMatch[1])
-            root._resolvePlaylistUrl = url
-            root._resolvePlaylistSource = "youtube"
-            root._resolvePlaylistProc.running = true
-            return
-        }
-        
-        // It's a single video — extract ID and resolve metadata
-        const videoId = root._extractVideoId(url)
-        if (videoId) {
-            root._log("[YtMusic] Detected YouTube video:", videoId)
-            root._resolveTrackUrl = url
-            root._resolveTrackSource = "youtube"
-            root._resolveTrackProc.running = true
-            return
-        }
-        
-        // URL recognized but couldn't parse — treat as search fallback
-        root._log("[YtMusic] Unparseable YouTube URL, running as search")
-        _searchQuery = url
-        _searchProc.running = true
-    }
+            if (videoId) {
+                root._resolveYoutubeTrackUrl = normalizedUrl
+                _resolveYoutubeTrackProc.running = true
+            } else if (playlistId) {
+                root._resolveYoutubePlaylistUrl = normalizedUrl
+                _resolveYoutubePlaylistProc.running = true
+            } else {
+                root.searching = false
+                root.error = Translation.tr("Could not resolve this YouTube Music URL.")
+            }
 
-    // Handle Spotify URL - resolve and display inline
-    function _handleSpotifyUrl(url): void {
-        root._log("[YtMusic] Handling Spotify URL:", url)
-        root.searching = true
-        root.searchResults = []
-        
-        // Check if it's a playlist
-        const playlistMatch = url.match(/playlist\/([A-Za-z0-9]+)/)
-        if (playlistMatch && playlistMatch[1]) {
-            root._log("[YtMusic] Detected Spotify playlist:", playlistMatch[1])
-            root._resolvePlaylistUrl = url
-            root._resolvePlaylistSource = "spotify"
-            root._resolvePlaylistProc.running = true
+            _addToRecentSearches(trimmed)
             return
         }
-        
-        // It's a track — fetch metadata via yt-dlp, then play
-        root._log("[YtMusic] Detected Spotify track, resolving metadata")
-        root._resolveTrackUrl = url
-        root._resolveTrackSource = "spotify"
-        root._resolveTrackProc.running = true
+
+        root.searching = true
+        root.searchResults = []
+        _searchQuery = trimmed
+        _searchProc.running = true
+        _addToRecentSearches(trimmed)
     }
     
     // clearArtistInfo() removed — currentArtistInfo was dead code
@@ -529,8 +486,7 @@ Singleton {
     property real _fadeVolume: 1.0
     
     function _playInternal(item): void {
-        if (!root.available) return
-        if (!item?.videoId && !item?.url) return
+        if (!item?.videoId || !root.available) return
         root.error = ""
         root.loading = true
         // Mark that a user-initiated play is in progress. This prevents old mpv's
@@ -543,7 +499,7 @@ Singleton {
         root.currentTitle = item.title || ""
         root.currentArtist = item.artist || ""
         root.currentVideoId = item.videoId || ""
-        root.currentThumbnail = item.videoId ? _getThumbnailUrl(item.videoId) : ""
+        root.currentThumbnail = _getThumbnailUrl(item.videoId)
         root.currentUrl = item.url || `https://www.youtube.com/watch?v=${item.videoId}`
         root.currentDuration = item.duration || 0
         root.currentPosition = 0
@@ -556,7 +512,7 @@ Singleton {
     }
     
     function play(item): void {
-        if (!item?.videoId && !item?.url) return
+        if (!item?.videoId) return
         root.activePlaylist = [item]
         root.currentIndex = 0
         root.activePlaylistSource = "single"
@@ -1435,9 +1391,7 @@ print("")
     }
 
     function importYtMusicPlaylist(playlistUrl, name): void {
-        if (!playlistUrl) return
-        // Allow Spotify URLs without googleConnected
-        if (!root.googleConnected && !playlistUrl.includes("spotify.com") && !playlistUrl.startsWith("spotify:")) return
+        if (!root.googleConnected || !playlistUrl) return
         root.searching = true
         _importPlaylistUrl = playlistUrl
         _importPlaylistName = name || "Imported Playlist"
@@ -1451,10 +1405,8 @@ print("")
 
     property string _searchQuery: ""
     property string _playUrl: ""
-    property string _resolveTrackUrl: ""
-    property string _resolveTrackSource: "" // "youtube" or "spotify"
-    property string _resolvePlaylistUrl: ""
-    property string _resolvePlaylistSource: "" // "youtube" or "spotify"
+    property string _resolveYoutubeTrackUrl: ""
+    property string _resolveYoutubePlaylistUrl: ""
     property string _importPlaylistUrl: ""
     property string _importPlaylistName: ""
 
@@ -1891,6 +1843,88 @@ print("")
         }
     }
 
+    Process {
+        id: _resolveYoutubeTrackProc
+        property var item: null
+        command: ["/usr/bin/yt-dlp",
+            ...(root.googleConnected ? root._cookieArgs : []),
+            "-j",
+            "--no-warnings",
+            "--quiet",
+            root._resolveYoutubeTrackUrl
+        ]
+        onStarted: { item = null }
+        stdout: SplitParser {
+            onRead: line => {
+                try {
+                    const data = JSON.parse(line)
+                    const videoId = data.id || root._extractVideoId(root._resolveYoutubeTrackUrl)
+                    if (!videoId) return
+                    _resolveYoutubeTrackProc.item = {
+                        videoId: videoId,
+                        title: data.title || "Unknown",
+                        artist: data.channel || data.uploader || "",
+                        duration: data.duration || 0,
+                        thumbnail: root._getThumbnailUrl(videoId),
+                        url: data.webpage_url || data.url || root._resolveYoutubeTrackUrl
+                    }
+                } catch (e) {}
+            }
+        }
+        onRunningChanged: {
+            if (!running) {
+                root.searching = false
+                if (item) {
+                    root.searchResults = [item]
+                } else {
+                    root.error = Translation.tr("Could not resolve this YouTube Music URL.")
+                }
+            }
+        }
+    }
+
+    Process {
+        id: _resolveYoutubePlaylistProc
+        property var items: []
+        command: ["/usr/bin/yt-dlp",
+            ...(root.googleConnected ? root._cookieArgs : []),
+            "--flat-playlist",
+            "--no-warnings",
+            "--quiet",
+            "-j",
+            root._resolveYoutubePlaylistUrl
+        ]
+        onStarted: { items = [] }
+        stdout: SplitParser {
+            onRead: line => {
+                try {
+                    const data = JSON.parse(line)
+                    if (!data.id) return
+                    const duration = data.duration || 0
+                    if (duration && (duration < 30 || duration > 600)) return
+                    items.push({
+                        videoId: data.id,
+                        title: data.title || "Unknown",
+                        artist: data.channel || data.uploader || "",
+                        duration: duration,
+                        thumbnail: root._getThumbnailUrl(data.id),
+                        url: data.url || data.webpage_url || `https://music.youtube.com/watch?v=${data.id}`
+                    })
+                } catch (e) {}
+            }
+        }
+        onRunningChanged: {
+            if (!running) {
+                root.searching = false
+                if (items.length > 0) {
+                    root.searchResults = items
+                } else {
+                    root.error = Translation.tr("Could not resolve this YouTube playlist.")
+                }
+            }
+        }
+    }
+
     // Use a short, guaranteed-existing path for the mpv IPC socket to avoid unix socket length issues
     property string ipcSocket: "/tmp/qs-ytmusic-mpv.sock"
 
@@ -1919,38 +1953,29 @@ print("")
     Process {
         id: _playProc
         property string _stderr: ""
-        command: {
-            let cmd = [
-                "/usr/bin/mpv",
-                "--no-video",
-                "--force-window=no",
-                "--audio-display=no",
-                "--input-ipc-server=" + root.ipcSocket,
-                ...(root._hasMpvMpris ? ["--script=/usr/lib/mpv-mpris/mpris.so"] : []),
-                "--metadata-codepage=utf-8",
-                "--volume=" + root._savedVolume,
-                "--audio-buffer=1",
-                "--initial-audio-sync=yes",
-                "--demuxer-max-bytes=50MiB",
-                "--demuxer-readahead-secs=10",
-                "--cache=yes",
-                "--cache-secs=30",
-                "--script-opts=ytdl_hook-ytdl_path=yt-dlp",
-                "--ytdl-format=" + root._ytdlFormat,
-            ]
-            // Only force media title if we have one (not Spotify URLs)
-            if (root.currentTitle) {
-                cmd.push("--force-media-title=" + root.currentTitle + (root.currentArtist ? " - " + root.currentArtist : ""))
-            }
-            if (root.googleConnected && root._mpvCookiesFile) {
-                cmd.push(
-                    "--ytdl-raw-options=cookies=" + root._mpvCookiesFile + ",js-runtimes=node,remote-components=ejs:github",
-                    "--cookies-file=" + root._mpvCookiesFile
-                )
-            }
-            cmd.push(root._playUrl)
-            return cmd
-        }
+        command: ["/usr/bin/mpv",
+            "--no-video",
+            "--force-window=no",
+            "--audio-display=no",
+            "--input-ipc-server=" + root.ipcSocket,
+            ...(root._hasMpvMpris ? ["--script=/usr/lib/mpv-mpris/mpris.so"] : []),
+            "--force-media-title=" + root.currentTitle + (root.currentArtist ? " - " + root.currentArtist : ""),
+            "--metadata-codepage=utf-8",
+            "--volume=" + root._savedVolume,
+            "--audio-buffer=1",
+            "--initial-audio-sync=yes",
+            "--demuxer-max-bytes=50MiB",
+            "--demuxer-readahead-secs=10",
+            "--cache=yes",
+            "--cache-secs=30",
+            "--script-opts=ytdl_hook-ytdl_path=yt-dlp",
+            "--ytdl-format=" + root._ytdlFormat,
+            ...(root.googleConnected && root._mpvCookiesFile ? [
+                "--ytdl-raw-options=cookies=" + root._mpvCookiesFile + ",js-runtimes=node,remote-components=ejs:github",
+                "--cookies-file=" + root._mpvCookiesFile
+            ] : []),
+            root._playUrl
+        ]
         stderr: SplitParser {
             onRead: line => { _playProc._stderr += line + "\n" }
         }
@@ -1982,102 +2007,6 @@ print("")
             } else if (code !== 0 && code !== 4 && code !== 9 && code !== 15 && code !== 143 && code !== 137) {
                 const hint = _stderr.trim().split("\n").slice(-2).join(" ").substring(0, 120)
                 root.error = Translation.tr("Playback failed") + (hint ? ": " + hint : "")
-            }
-        }
-    }
-
-    // Fetch metadata for a single track/video URL and populate searchResults
-    // so the sidebar shows the resolved content. Falls back to ytsearch if the
-    // resolve fails — preserves the old search behavior as a safety net.
-    Process {
-        id: _resolveTrackProc
-        property var item: null
-        command: ["/usr/bin/yt-dlp",
-            ...(root.googleConnected && root._resolveTrackSource === "youtube" ? root._cookieArgs : []),
-            "-j", "--no-warnings", "--quiet",
-            root._resolveTrackUrl
-        ]
-        stdout: SplitParser {
-            onRead: line => {
-                try {
-                    const data = JSON.parse(line)
-                    const vid = root._resolveTrackSource === "youtube" ? (data.id || "") : ""
-                    _resolveTrackProc.item = {
-                        videoId: vid,
-                        title: data.title || data.track || "Unknown",
-                        artist: data.channel || data.uploader || data.artist || "",
-                        duration: data.duration || 0,
-                        thumbnail: vid ? root._getThumbnailUrl(vid) : (data.thumbnail || ""),
-                        url: root._resolveTrackUrl
-                    }
-                } catch (e) {}
-            }
-        }
-        onStarted: { _resolveTrackProc.item = null }
-        onRunningChanged: {
-            if (!running) {
-                root.searching = false
-                if (_resolveTrackProc.item) {
-                    // Populate searchResults so the user sees the resolved item
-                    root.searchResults = [_resolveTrackProc.item]
-                } else {
-                    root._log("[YtMusic] Resolve failed, falling back to search for:", root._resolveTrackUrl)
-                    // Fallback: search yt-dlp for the URL text (old behavior)
-                    root.searching = true
-                    root.searchResults = []
-                    _searchQuery = root._resolveTrackUrl
-                    _searchProc.running = true
-                }
-            }
-        }
-    }
-
-    // Resolves playlist items into searchResults so the sidebar shows them inline.
-    // Falls back to ytsearch when the resolve fails.
-    Process {
-        id: _resolvePlaylistProc
-        property var items: []
-        command: {
-            let cmd = ["/usr/bin/yt-dlp", "--flat-playlist", "--no-warnings", "--quiet", "-j"]
-            if (root._resolvePlaylistSource === "youtube" && root.googleConnected) {
-                cmd.push(...root._cookieArgs)
-            }
-            cmd.push(root._resolvePlaylistUrl)
-            return cmd
-        }
-        stdout: SplitParser {
-            onRead: line => {
-                try {
-                    const data = JSON.parse(line)
-                    if (!data.id && !data.url) return
-                    const vid = root._resolvePlaylistSource === "youtube" ? (data.id || "") : ""
-                    const duration = data.duration || 0
-                    // Keep tracks under 10 min — longer content is usually not music
-                    if (duration > 600) return
-                    _resolvePlaylistProc.items.push({
-                        videoId: vid,
-                        title: data.title || "Unknown",
-                        artist: data.channel || data.uploader || data.artist || "",
-                        duration: duration,
-                        thumbnail: vid ? root._getThumbnailUrl(vid) : "",
-                        url: data.url || (vid ? `https://www.youtube.com/watch?v=${vid}` : data.webpage_url || data.original_url || "")
-                    })
-                } catch (e) {}
-            }
-        }
-        onStarted: { items = [] }
-        onRunningChanged: {
-            if (!running) {
-                root.searching = false
-                if (items.length > 0) {
-                    root.searchResults = items
-                } else {
-                    root._log("[YtMusic] Playlist resolve failed, falling back to search for:", root._resolvePlaylistUrl)
-                    root.searching = true
-                    root.searchResults = []
-                    _searchQuery = root._resolvePlaylistUrl
-                    _searchProc.running = true
-                }
             }
         }
     }
@@ -2120,15 +2049,14 @@ print("")
     Process {
         id: _importPlaylistProc
         property var items: []
-        command: {
-            let cmd = ["/usr/bin/yt-dlp", "--flat-playlist", "--no-warnings", "--quiet", "-j"]
-            // Only add cookie args for YouTube URLs, not Spotify
-            if (!root._importPlaylistUrl.includes("spotify")) {
-                cmd.push(...root._cookieArgs)
-            }
-            cmd.push(root._importPlaylistUrl)
-            return cmd
-        }
+        command: ["/usr/bin/yt-dlp",
+            ...root._cookieArgs,
+            "--flat-playlist",
+            "--no-warnings",
+            "--quiet",
+            "-j",
+            root._importPlaylistUrl
+        ]
         stdout: SplitParser {
             onRead: line => {
                 try {
