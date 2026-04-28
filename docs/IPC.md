@@ -515,7 +515,7 @@ bind "Mod+P" { spawn "inir" "keepass" "toggle"; }
 bind "Mod+Ctrl+P" { spawn "inir" "keepass" "add"; }
 ```
 
-Requires `keepassxc` (for `keepassxc-cli`) and a `.kdbx` vault. Set `keepass.vaultDir` in the shell config to point at the directory containing your vaults (defaults to `~/.local/share/keepassqs`); existing vaults are listed in the picker, and new ones can be created from the UI.
+Requires `keepassxc` (for `keepassxc-cli`), `libsecret` (for `secret-tool`) and a `.kdbx` vault. Set `keepass.vaultDir` in the shell config to point at the directory containing your vaults (defaults to `~/.local/share/keepassqs`); existing vaults are listed in the picker, and new ones can be created from the UI. Password caching is handled securely via the system keyring.
 
 ---
 

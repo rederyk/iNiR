@@ -12,7 +12,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    property string scriptPath: FileUtils.trimFileProtocol(`${Directories.config}/quickshell/inir/scripts/quickshell-keepass`)
+    property string scriptPath: FileUtils.trimFileProtocol(`${Directories.scriptsPath}/quickshell-keepass`)
     readonly property string vaultDir: Config.options?.keepass?.vaultDir
         || FileUtils.trimFileProtocol(`${Directories.home}/.local/share/keepassqs`)
     property string vaultPath: ""
