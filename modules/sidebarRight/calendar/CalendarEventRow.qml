@@ -125,12 +125,12 @@ Item {
                         const tomorrow = new Date(now)
                         tomorrow.setDate(tomorrow.getDate() + 1)
                         if (d.toDateString() === now.toDateString())
-                            return Translation.tr("Today") + " " + Qt.formatTime(d, "HH:mm")
+                            return Translation.tr("Today") + " " + DateTime.formatTime(d)
                         if (d.toDateString() === tomorrow.toDateString())
-                            return Translation.tr("Tomorrow") + " " + Qt.formatTime(d, "HH:mm")
-                        return Qt.formatDate(d, "dd/MM") + " " + Qt.formatTime(d, "HH:mm")
+                            return Translation.tr("Tomorrow") + " " + DateTime.formatTime(d)
+                        return Qt.formatDate(d, "dd/MM") + " " + DateTime.formatTime(d)
                     }
-                    return Qt.formatTime(d, "HH:mm")
+                    return DateTime.formatTime(d)
                 }
                 font.pixelSize: Appearance.font.pixelSize.smallest
                 font.family: Appearance.font.family.numbers

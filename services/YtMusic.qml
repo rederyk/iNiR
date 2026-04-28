@@ -1323,7 +1323,7 @@ print("")
             root.syncingLiked = false
             if (code === 0 && _fetchLikedProc.newLiked.length > 0) {
                 root.likedSongs = _fetchLikedProc.newLiked
-                root.lastLikedSync = new Date().toLocaleString(Qt.locale(), "yyyy-MM-dd hh:mm")
+                root.lastLikedSync = Qt.locale().toString(new Date(), "yyyy-MM-dd ") + DateTime.formatTime(new Date())
                 Config.setNestedValue('sidebar.ytmusic.liked', root.likedSongs)
                 Config.setNestedValue('sidebar.ytmusic.lastLikedSync', root.lastLikedSync)
             } else {
@@ -1375,7 +1375,7 @@ print("")
             root.syncingLiked = false
             if (code === 0 && _fetchLikedFallbackProc.newLiked.length > 0) {
                 root.likedSongs = _fetchLikedFallbackProc.newLiked
-                root.lastLikedSync = new Date().toLocaleString(Qt.locale(), "yyyy-MM-dd hh:mm")
+                root.lastLikedSync = Qt.locale().toString(new Date(), "yyyy-MM-dd ") + DateTime.formatTime(new Date())
                 Config.setNestedValue('sidebar.ytmusic.liked', root.likedSongs)
                 Config.setNestedValue('sidebar.ytmusic.lastLikedSync', root.lastLikedSync)
             }
@@ -1411,7 +1411,7 @@ print("")
         onExited: (code) => {
             if (_fetchLikedOAuthProc._items.length > 0) {
                 root.likedSongs = _fetchLikedOAuthProc._items
-                root.lastLikedSync = new Date().toLocaleString(Qt.locale(), "yyyy-MM-dd hh:mm")
+                root.lastLikedSync = Qt.locale().toString(new Date(), "yyyy-MM-dd ") + DateTime.formatTime(new Date())
                 Config.setNestedValue('sidebar.ytmusic.liked', root.likedSongs)
                 Config.setNestedValue('sidebar.ytmusic.lastLikedSync', root.lastLikedSync)
                 root.syncingLiked = false

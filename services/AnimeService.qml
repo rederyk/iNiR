@@ -308,7 +308,7 @@ Singleton {
         let broadcast = ""
         if (nextEp?.airingAt) {
             const d = new Date(nextEp.airingAt * 1000)
-            broadcast = Qt.formatDateTime(d, "ddd hh:mm") + " (Ep " + nextEp.episode + ")"
+            broadcast = Qt.locale().toString(d, "ddd ") + DateTime.formatTime(d) + " (Ep " + nextEp.episode + ")"
         }
         
         return {

@@ -412,13 +412,13 @@ BodyRectangle {
                         if (eventRow.event?.allDay) return Translation.tr("All day")
                         const d = new Date(eventRow.event?.startDate ?? eventRow.event?.dateTime ?? "")
                         if (isNaN(d.getTime())) return ""
-                        if (!eventRow.showDayPrefix) return Qt.formatTime(d, "HH:mm")
+                        if (!eventRow.showDayPrefix) return DateTime.formatTime(d)
                         const now = new Date()
                         const tomorrow = new Date(now)
                         tomorrow.setDate(tomorrow.getDate() + 1)
                         const dayOffset = eventRow.event?._dayOffset ?? 0
                         const prefix = dayOffset === 0 ? "" : dayOffset === 1 ? Translation.tr("Tomorrow") + " " : Qt.formatDate(d, "dd/MM") + " "
-                        return prefix + Qt.formatTime(d, "HH:mm")
+                        return prefix + DateTime.formatTime(d)
                     }
                     font.pixelSize: Looks.font.pixelSize.small
                     font.family: Looks.font.family.monospace

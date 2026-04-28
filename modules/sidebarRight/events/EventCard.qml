@@ -168,14 +168,14 @@ Item {
                             StyledText {
                                 text: {
                                     if (root.isAllDay) return Translation.tr("All day")
-                                    if (root.isToday) return Translation.tr("Today") + " " + Qt.formatTime(root.eventDate, "HH:mm")
+                                    if (root.isToday) return Translation.tr("Today") + " " + DateTime.formatTime(root.eventDate)
                                     const now = new Date()
                                     const tomorrow = new Date(now)
                                     tomorrow.setDate(tomorrow.getDate() + 1)
                                     if (root.eventDate.toDateString() === tomorrow.toDateString()) {
-                                        return Translation.tr("Tomorrow") + " " + Qt.formatTime(root.eventDate, "HH:mm")
+                                        return Translation.tr("Tomorrow") + " " + DateTime.formatTime(root.eventDate)
                                     }
-                                    return Qt.formatDate(root.eventDate, "dd/MM") + " " + Qt.formatTime(root.eventDate, "HH:mm")
+                                    return Qt.formatDate(root.eventDate, "dd/MM") + " " + DateTime.formatTime(root.eventDate)
                                 }
                                 font.pixelSize: Appearance.font.pixelSize.smallest
                                 font.weight: Font.Medium
