@@ -20,6 +20,14 @@ Singleton {
     }
     property string time: Qt.locale().toString(clock.date, Config.options?.time.format ?? "hh:mm")
     property string shortDate: Qt.locale().toString(clock.date, Config.options?.time.shortDateFormat ?? "dd/MM")
+
+    /**
+     * Formats a date using the user's preferred time format.
+     */
+    function formatTime(date) {
+        return Qt.locale().toString(date, Config.options?.time.format ?? "hh:mm");
+    }
+
     property string date: Qt.locale().toString(clock.date, Config.options?.time.dateFormat ?? "dddd, dd/MM")
     property string collapsedCalendarFormat: Qt.locale().toString(clock.date, "dd MMMM yyyy")
     property string uptime: "0h, 0m"
