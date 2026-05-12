@@ -133,6 +133,7 @@ Scope {
         StyledRectangularShadow {
             target: cheatsheetBackground
             radius: cheatsheetBackground.radius
+            opacity: cheatsheetBackground.opacity
         }
 
         Rectangle {

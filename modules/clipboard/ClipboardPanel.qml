@@ -250,6 +250,7 @@ Scope {
             target: panelBackground
             radius: panelBackground.radius
             visible: Appearance.angelEverywhere || (!Appearance.inirEverywhere && !Appearance.auroraEverywhere)
+            opacity: panelBackground.opacity
         }
 
         // Click outside the panel to close
