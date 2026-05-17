@@ -62,6 +62,7 @@ ii loads about 25 panels through `ShellIiPanels.qml`. Some notable ones:
 | `iiBackground` | Desktop wallpaper layer |
 | `iiMediaControls` | MPRIS media player popup |
 | `iiClipboard` | Clipboard history browser |
+| `iiKeepass` | KeePass password manager overlay |
 
 ### Bar zones
 

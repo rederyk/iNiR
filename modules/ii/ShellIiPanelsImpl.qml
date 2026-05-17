@@ -19,6 +19,7 @@ import qs.modules.ii.overlay
 import qs.modules.shellUpdate
 import qs.modules.workspaceStrip
 import qs.modules.clipboard as ClipboardModule
+import "../keepass" as KeepassModule
 
 import QtQuick
 import Quickshell
@@ -243,6 +244,7 @@ Item {
     OnDemandPanelLoader { identifier: "iiShellUpdate"; open: ShellUpdates.overlayOpen; closeGraceMs: 250; component: ShellUpdateOverlay {} }
     OnDemandPanelLoader { identifier: "iiRecordingOsd"; open: RecorderStatus.isRecording; closeGraceMs: 250; component: RecordingOsd {} }
     DeferredPanelLoader { identifier: "iiWorkspaceStrip"; component: WorkspaceStrip {} }
+    OnDemandPanelLoader { identifier: "iiKeepass"; open: KeePass.open; retainAfterUse: true; closeGraceMs: 250; component: KeepassModule.KeepassPanel {} }
     DeferredPanelLoader { identifier: "iiMascotCompanion"; extraCondition: Config.options?.mascot?.enable ?? false; component: MascotCompanion {} }
 
     Loader {
