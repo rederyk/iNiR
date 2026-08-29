@@ -663,6 +663,11 @@ ShellRoot {
     // AltSwitcher controller selection lives above the family loaders. Waffle
     // receives the lightweight shared router; ii receives either that controller
     // or the full visual tree according to its no-visual setting.
+    // Force the KeePass singleton to instantiate at the root so its IpcHandler
+    // is registered from boot, even before the deferred panel host loads and
+    // even when iiKeepass is absent from enabledPanels (singletons are lazy).
+    readonly property bool _keepassReady: KeePass.available
+
     property list<string> families: ["ii", "waffle"]
     property var panelFamilies: ({
         "ii": [

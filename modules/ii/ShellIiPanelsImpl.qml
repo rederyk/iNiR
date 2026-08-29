@@ -34,10 +34,6 @@ import qs.modules.common.widgets
 Item {
     id: panelsRoot
 
-    // Force KeePass singleton to instantiate so its IpcHandler is always active,
-    // even when iiKeepass is absent from enabledPanels (singletons are lazy by default).
-    readonly property bool _keepassReady: KeePass.available
-
     component PanelLoader: LazyLoader {
         required property string identifier
         property bool extraCondition: true
@@ -248,7 +244,7 @@ Item {
     OnDemandPanelLoader { identifier: "iiShellUpdate"; open: ShellUpdates.overlayOpen; closeGraceMs: 250; component: ShellUpdateOverlay {} }
     OnDemandPanelLoader { identifier: "iiRecordingOsd"; open: RecorderStatus.isRecording; closeGraceMs: 250; component: RecordingOsd {} }
     DeferredPanelLoader { identifier: "iiWorkspaceStrip"; component: WorkspaceStrip {} }
-    DeferredPanelLoader { identifier: "iiKeepass"; component: KeepassModule.KeepassPanel {} }
+    OnDemandPanelLoader { identifier: "iiKeepass"; open: KeePass.open; retainAfterUse: true; closeGraceMs: 250; component: KeepassModule.KeepassPanel {} }
     DeferredPanelLoader { identifier: "iiMascotCompanion"; extraCondition: Config.options?.mascot?.enable ?? false; component: MascotCompanion {} }
 
     Loader {

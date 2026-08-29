@@ -25,14 +25,29 @@ PanelWindow {
     anchors.right: true
     anchors.bottom: true
 
-    // Always-mapped surface: input gated by mask, never by visibility.
-    // Avoids Qt6 physicalDpiChanged infinite recursion on Hyprland surface remap.
+    // Lifetime is owned by the OnDemandPanelLoader in ShellIiPanelsImpl: the
+    // window is created when KeePass.open flips true and destroyed a while
+    // after it closes. While alive, input is gated by mask, never by
+    // visibility, which avoids the Qt6 physicalDpiChanged recursion on
+    // Hyprland surface remap.
     mask: Region { item: KeePass.open ? backdropClickArea : noInputItem }
+
+    // Deferred mirror of KeePass.open so the entrance animation still plays
+    // when the window is instantiated with the panel already open.
+    property bool _presentedOpen: false
+
+    function presentOpen(): void {
+        panelColumn.focusDefault()
+        Qt.callLater(() => { root._presentedOpen = KeePass.open })
+    }
+
+    Component.onCompleted: if (KeePass.open) presentOpen()
 
     Connections {
         target: KeePass
         function onOpenChanged() {
-            if (KeePass.open) panelColumn.focusDefault()
+            if (KeePass.open) root.presentOpen()
+            else root._presentedOpen = false
         }
     }
 
@@ -84,8 +99,8 @@ PanelWindow {
         screenWidth: root.screen?.width ?? 1920
         screenHeight: root.screen?.height ?? 1080
 
-        opacity: KeePass.open ? 1 : 0
-        scale: KeePass.open ? 1 : 0.97
+        opacity: root._presentedOpen ? 1 : 0
+        scale: root._presentedOpen ? 1 : 0.97
 
         Behavior on opacity {
             NumberAnimation {
