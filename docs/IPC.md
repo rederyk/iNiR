@@ -768,6 +768,24 @@ Tiling layout overlay. Pick or cycle through tiling presets for the current work
 
 ---
 
+### keepass
+
+KeePass password manager overlay. Search entries, copy passwords/usernames, and add new entries.
+
+| Function | Description |
+|----------|-------------|
+| `toggle` | Open/close KeePass panel |
+| `add` | Open panel in "add entry" mode, pre-filling title from primary selection |
+
+```kdl
+bind "Mod+P" { spawn "inir" "keepass" "toggle"; }
+bind "Mod+Ctrl+P" { spawn "inir" "keepass" "add"; }
+```
+
+Requires `keepassxc` (for `keepassxc-cli`), `libsecret` (for `secret-tool`) and a `.kdbx` vault. Set `keepass.vaultDir` in the shell config to point at the directory containing your vaults (defaults to `~/.local/share/keepassqs`); existing vaults are listed in the picker, and new ones can be created from the UI. Password caching is handled securely via the system keyring.
+
+---
+
 ### keyboard
 
 Keyboard layout switching (Niri only). Cycles through configured keyboard layouts and queries layout info.

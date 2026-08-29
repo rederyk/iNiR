@@ -671,7 +671,7 @@ ShellRoot {
             "iiOverlay", "iiOverview", "iiPolkit", "iiRegionSelector", "iiScreenCorners",
             "iiSessionScreen", "iiSidebarLeft", "iiSidebarRight", "iiTilingOverlay", "iiVerticalBar",
             "iiWallpaperSelector", "iiWallpaperLauncher", "iiCoverflowSelector", "iiClipboard", "iiShellUpdate", "iiRecordingOsd", "iiDashboard",
-            "iiMascotCompanion"
+            "iiMascotCompanion", "iiKeepass"
         ],
         "waffle": [
             "wBar", "wBackground", "wBackdrop", "wStartMenu", "wActionCenter", "wNotificationCenter", "wNotificationPopup", "wOnScreenDisplay", "wWidgets", "wTaskView", "wLock", "wPolkit", "wSessionScreen",

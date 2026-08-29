@@ -2189,7 +2189,8 @@
         "iiClipboard",
         "iiShellUpdate",
         "iiDashboard",
-        "iiMascotCompanion"
+        "iiMascotCompanion",
+        "iiKeepass"
     ],
     "workspaceStrip": {
         "style": "auto",
@@ -2221,5 +2222,9 @@
         "groqModel": "whisper-large-v3-turbo",
         "geminiModel": "gemini-2.5-flash",
         "openaiModel": "gpt-4o-mini-transcribe"
+    },
+    "keepass": {
+        "vaultDir": "",
+        "cacheTtl": 300
     }
 }

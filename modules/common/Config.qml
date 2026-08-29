@@ -2670,6 +2670,11 @@ Singleton {
                 property list<string> pinned: []
             }
 
+            property JsonObject keepass: JsonObject {
+                property string vaultDir: ""
+                property int cacheTtl: 300 // seconds the vault stays unlocked
+            }
+
             property JsonObject search: JsonObject {
                 property string style: "default" // "default" | "island" (Ricelin gradient card surface)
                 property int nonAppResultDelay: 30 // This prevents lagging when typing

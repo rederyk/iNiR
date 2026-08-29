@@ -5358,5 +5358,18 @@
   "No more results for this search.": "No more results for this search.",
   "No wallpapers found for these tags and filters.": "No wallpapers found for these tags and filters.",
   "Wallhaven rate limit reached. Wait a moment and try again.": "Wallhaven rate limit reached. Wait a moment and try again.",
-  "Wallhaven request failed (HTTP %1).": "Wallhaven request failed (HTTP %1)."
+  "Wallhaven request failed (HTTP %1).": "Wallhaven request failed (HTTP %1).",
+  "KeePass": "KeePass",
+  "KeePass - Save": "KeePass - Save",
+  "Vault password": "Vault password",
+  "Stay unlocked:": "Stay unlocked:",
+  "Search entries": "Search entries",
+  "Copy Password": "Copy Password",
+  "Copy Username": "Copy Username",
+  "Entry name (e.g. Email/GitHub)": "Entry name (e.g. Email/GitHub)",
+  "Username (optional)": "Username (optional)",
+  "URL (optional)": "URL (optional)",
+  "Generate": "Generate",
+  "Len:": "Len:",
+  "keepass_wordlist": "apple tiger river stone cloud forest bridge candle hammer spider island castle mirror thunder garden pencil butter coffee pepper winter autumn needle rocket planet silver copper violin cactus lantern walnut shadow marble carrot pillow cannon barrel clover donkey kettle ribbon salmon tunnel anchor rain snow wind sun moon star pear orange strawberry book chair table window door"
 }

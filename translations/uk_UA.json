@@ -5352,5 +5352,18 @@
   "Could not open the image converter.": "Could not open the image converter.",
   "Notification popups and OSD indicators": "Notification popups and OSD indicators",
   "Choose which monitors show notifications and OSD feedback": "Choose which monitors show notifications and OSD feedback",
-  "Choose widget visibility and layout per monitor": "Choose widget visibility and layout per monitor"
+  "Choose widget visibility and layout per monitor": "Choose widget visibility and layout per monitor",
+  "KeePass": "KeePass",
+  "KeePass - Save": "KeePass - Save",
+  "Vault password": "Vault password",
+  "Stay unlocked:": "Stay unlocked:",
+  "Search entries": "Search entries",
+  "Copy Password": "Copy Password",
+  "Copy Username": "Copy Username",
+  "Entry name (e.g. Email/GitHub)": "Entry name (e.g. Email/GitHub)",
+  "Username (optional)": "Username (optional)",
+  "URL (optional)": "URL (optional)",
+  "Generate": "Generate",
+  "Len:": "Len:",
+  "keepass_wordlist": "яблуко тигр річка камінь хмара ліс міст свічка молоток павук острів замок дзеркало грім сад олівець масло кава перець зима осінь голка ракета планета срібло мідь скрипка кактус ліхтар горіх тінь мармур морква подушка гармата бочка конюшина осел казан стрічка лосось тунель якір дощ сніг вітер сонце місяць зоря груша апельсин полуниця книга стілець стіл вікно двері"
 }
